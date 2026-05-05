@@ -9,8 +9,6 @@ This BOM lists all components required to build the RAFT arm. Quantities are for
 | Diameter / Type | Length | Quantity | Description | Link |
 |-----------------|--------|----------|-------------|------|
 | M3 nut |  | 1 |  |  |
-| M4 | 10 mm | 2 | Screw |  |
-| M3 | 6 mm | 4 | Cheese head screw |  |
 | M3 | 25 mm | 4 | Screw |  |
 | M3 | 8 mm | 6 | Screw |  |
 
@@ -28,14 +26,6 @@ This BOM lists all components required to build the RAFT arm. Quantities are for
 
 ---
 
-## Mechanical Components
-
-| Type | Quantity | Description | Link |
-|------|----------|-------------|------|
-| Shaft coupler | 1 | 8 mm bore, M4 screw holes | [Link](https://s.click.aliexpress.com/e/_c2xnQgI7) |
-| MGN7C slider | 2 | Linear guide carriage | [Link](https://s.click.aliexpress.com/e/_c4sRNxXV) |
-
-
 
 ---
 
@@ -49,9 +39,6 @@ This BOM lists all components required to build the RAFT arm. Quantities are for
 ---
 
 ## Cables
-
-
-
 
 
 | Type | Length / Spec | Quantity | Description | Link |

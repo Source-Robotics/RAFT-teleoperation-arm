@@ -15,11 +15,11 @@
 Robot arm force feedback teleopretion system
 
 [![License: CERN OHL v2 - Strongly Reciprocal](https://img.shields.io/badge/license-CERN--OHL--S--2.0-blue.svg)](https://spdx.org/licenses/CERN-OHL-S-2.0.html)
-   ![Issues](https://img.shields.io/github/issues/PCrnjak/MSG-compliant-AI-stepper-gripper) ![release](https://img.shields.io/github/v/release/PCrnjak/MSG-compliant-AI-stepper-gripper) 
+   ![Issues](https://img.shields.io/github/issues/Source-Robotics/RAFT-teleoperation-arm) ![release](https://img.shields.io/github/v/release/Source-Robotics/RAFT-teleoperation-arm) 
 <p align="center">
-  <a href="https://source-robotics.github.io/PAROL-docs/"><img src="https://img.shields.io/badge/doc-page-orange" alt="Documentation"></a>
+  <a href="https://docs.source-robotics.com/PAROL-docs/"><img src="https://img.shields.io/badge/doc-page-orange" alt="Documentation"></a>
   <a href="http://discord.gg/prjUvjmGpZ"><img src="https://img.shields.io/discord/1072498136284667955?logo=discord&color=blue" alt="Discord"></a>
-  <a href="https://source-robotics.com//"><img src="https://img.shields.io/badge/Shop-shopping-purple?logo=shopify" alt="Shop"></a>
+  <a href="https://source-robotics.com/"><img src="https://img.shields.io/badge/Shop-shopping-purple?logo=shopify" alt="Shop"></a>
   <a href="https://www.linkedin.com/company/source-robotics/"><img src="https://img.shields.io/badge/LinkedIn-Follow-blue?logo=linkedin" alt="LinkedIn"></a>
   <a href="https://x.com/SourceRobotics"><img src="https://img.shields.io/badge/X-Follow-black?logo=x" alt="X"></a>
   <a href="https://www.youtube.com/@source-robotics"><img src="https://img.shields.io/badge/YouTube-Subscribe-red?logo=youtube" alt="YouTube"></a>
@@ -64,7 +64,7 @@ xxx
 
 | Discord | Forum | Hackaday | Blog |
 |--------|-------|------| ------|
-| [![Discord](https://img.shields.io/badge/Discord-5865F2?logo=discord&logoColor=white)](https://discord.com/invite/prjUvjmGpZ) | [![Forum](https://img.shields.io/badge/Forum-0A0A0A)](https://discourse.source-robotics.com/) | [![Hackaday](https://img.shields.io/badge/Hackaday-000000?logo=hackaday&logoColor=white)](https://hackaday.io/project/191860-parol6-desktop-robotic-arm) | [![Blog](https://img.shields.io/badge/Blog-Source%20Robotics-blue)](https://source-robotics.com/blogs/blog) 
+| [![Discord](https://img.shields.io/badge/Discord-5865F2?logo=discord&logoColor=white)](https://discord.com/invite/prjUvjmGpZ) | [![Discussions](https://img.shields.io/badge/Discussions-0A0A0A?logo=github)](https://github.com/orgs/Source-Robotics/discussions) | [![Hackaday](https://img.shields.io/badge/Hackaday-000000?logo=hackaday&logoColor=white)](https://hackaday.io/project/191860-parol6-desktop-robotic-arm) | [![Blog](https://img.shields.io/badge/Blog-Source%20Robotics-blue)](https://source-robotics.com/blogs/blog) 
 
 
 ## ⚠️ Safety, Liability & Disclaimer
@@ -87,4 +87,4 @@ The majority of this project is open source and freely available to everyone. Yo
 [![General badge](https://img.shields.io/badge/Patreon-F96854?style=for-the-badge&logo=patreon&logoColor=white)](https://www.patreon.com/PCrnjak)
 
 ## 🛡️ Licensing
- Project is under [CERN Open Hardware Licence Version 2 - Strongly Reciprocal](https://github.com/PCrnjak/MSG-compliant-AI-stepper-gripper?tab=CERN-OHL-S-2.0-1-ov-file)
+ Project is under [CERN Open Hardware Licence Version 2 - Strongly Reciprocal](https://github.com/Source-Robotics/RAFT-teleoperation-arm?tab=CERN-OHL-S-2.0-1-ov-file)

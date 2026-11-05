@@ -45,8 +45,9 @@ Both at once is safe only because the Ethernet port gives no power: never USB to
 - **Hold the arm when torque changes.** Support the arm whenever torque goes on or off: LIMP and every fault drop it
   at once.
 - **Clamp it down.** Clamp the base plate to the table, with cable slack for J1 and the wrist.
-- **Do not press Rest yet.** Do not press Rest and do not switch auto-rest on: the rest pose (forearm 70 deg down)
-  drives the handle about 19 mm into the table. The rest pose is not final yet.
+- **Rest.** The Rest pose button (and auto-rest, off by default) moves the arm to its parking pose, the way it rests
+  limp: upper arm lying back 2 deg short of J2's stop, forearm folded down, wrist straight. There it goes limp and
+  settles the last few degrees onto its stops. Keep a hand near it the first time.
 - **Hands clear.** Keep fingers out of the trigger hinge and the elbow while a move runs.
 
 ## 1. Parts and tools
@@ -55,7 +56,7 @@ Both at once is safe only because the Ethernet port gives no power: never USB to
 |---|---|
 | Olimex ESP32-PoE | Check that the metal can says ESP32-WROOM-32: the firmware's Ethernet setup assumes it (the WROVER version moves the Ethernet clock to GPIO0). |
 | TTLinker mini | Half-duplex bus adapter (74HC126), `datasheets/TTLINKER.pdf`. Its logic runs at 5 V: see 2.1. |
-| 6.0 V servo supply | A bench supply with a current limit is best; otherwise a 6 V adapter rated 5 A or more with a floating output. The servos are rated 4.5 to 7.4 V (torque figures at 6 V); the TTLinker needs at least 6 V for its 5 V regulator: use 6.0 to 6.5 V. |
+| 6 V servo supply | Any DC adapter of 1.5 A or more with a floating output, 6 V best (5 to 7 V works); 2 to 3 A leaves headroom. A bench supply with a current limit is fine too. The servos are rated 4.5 to 7.4 V (torque figures at 6 V); the TTLinker's datasheet asks for 6 V or more for its 5 V regulator. |
 | Supply leads | 0.5 mm² (20 AWG) or thicker, with a switch in the + lead if the supply has none. |
 | Micro-USB cable | Power and serial console for the ESP32: flashing, the `set_id` tool, console commands. |
 | Ethernet cable, router or switch with DHCP | Same network as the PC. At the bench, a port without PoE. |
@@ -98,7 +99,7 @@ The servos themselves accept 2 to 5 V signals (HLS3606 datasheet), so only the a
 
 | From | To | Notes |
 |---|---|---|
-| Supply + (through the switch) | TTLinker VIN | 6.0 to 6.5 V. The servos get their power through the TTLinker's servo ports. |
+| Supply + (through the switch) | TTLinker VIN | 6 V (5 to 7 V works). The servos get their power through the TTLinker's servo ports. |
 | Supply - | TTLinker GND | |
 | TTLinker GND | ESP32-PoE GND, left header pin 3 | Common ground: without it nothing works. |
 | ESP32-PoE GPIO32, right header | TTLinker TX1 | The TTLinker's pins are named after the Arduino pins they go to: TX1 takes the controller's TX. |

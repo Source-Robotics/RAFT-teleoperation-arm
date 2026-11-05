@@ -122,9 +122,11 @@ ControlConfig defaultControlConfig()
     c.autoRest.stillSpeedRadS = 0.05f;
     c.autoRest.stillAngleRad = 2.0f * kPi / 180.0f;
     c.autoRest.speedRadS = 0.4f;
-    // forearm 70 deg down: the lowest fold the CAD allows (at -80 deg and below the wrist hits the shoulder
-    // bracket and the base); J2 and J3 carry ~125 mA there
-    const float rest[kNumJoints] = {0.0f, 0.0f, -70.0f * kPi / 180.0f, 0.0f, 0.0f, 0.0f, 0.0f};
+    // the arm lying back the way it rests limp (Petar, 2026-11-05): upper arm 2 deg short of J2's stop (-83.96), forearm
+    // folded down to J3 -80, wrist straight. In the CAD every part keeps 8 mm from the others and the handle stays 41 mm
+    // above the table, also on the straight move there from the usual poses; the arm then goes limp and settles the
+    // last few degrees onto its stops. (Forearm 70 deg down with the upper arm vertical put the handle into the table.)
+    const float rest[kNumJoints] = {0.0f, -82.0f * kPi / 180.0f, -80.0f * kPi / 180.0f, 0.0f, 0.0f, 0.0f, 0.0f};
     for (int i = 0; i < kNumJoints; ++i) c.autoRest.qRest[i] = rest[i];
     return c;
 }
@@ -183,19 +185,19 @@ void Controller::setMode(Mode m)
     mode_ = m;
 }
 
-bool Controller::moveTo(const float qTarget[kNumJoints], float speedRadS)
+bool Controller::moveTo(const float qTarget[kNumJoints], float speedRadS, bool rest)
 {
     if (!haveQ_) return false;
     const float v = speedRadS > 0.0f ? speedRadS : cfg_.moveSpeedRadS;
     float maxDelta = 0.0f;
     for (int i = 0; i < kNumJoints; ++i) {
         moveStart_[i] = lastQ_[i];
-        moveGoal_[i] = clampf(qTarget[i], cfg_.joint[i].qMinRad, cfg_.joint[i].qMaxRad);
+        moveGoal_[i] = rest ? qTarget[i] : clampf(qTarget[i], cfg_.joint[i].qMinRad, cfg_.joint[i].qMaxRad);
         maxDelta = fmaxf(maxDelta, fabsf(moveGoal_[i] - moveStart_[i]));
     }
     moveDur_ = fmaxf(0.2f, 1.875f * maxDelta / v);   // minimum-jerk peak speed = 1.875 * delta / T
     moveT_ = 0.0f;
-    moveIsRest_ = false;
+    moveIsRest_ = rest;
     tracking_ = false;
     if (mode_ != Mode::Move) { ramp_ = 1.0f; }
     mode_ = Mode::Move;
@@ -336,8 +338,7 @@ void Controller::step(const ControlInput& in, float dt, ControlOutput& out)
         float dist = 0.0f;
         for (int i = 0; i < kNumJoints; ++i) dist = fmaxf(dist, fabsf(in.q[i] - cfg_.autoRest.qRest[i]));
         if (idleT_ >= cfg_.autoRest.idleTimeS && dist > cfg_.autoRest.stillAngleRad) {
-            moveTo(cfg_.autoRest.qRest, cfg_.autoRest.speedRadS);
-            moveIsRest_ = true;
+            moveTo(cfg_.autoRest.qRest, cfg_.autoRest.speedRadS, true);
             out.events |= EV_AUTO_REST;
             idleT_ = 0.0f;
         }
@@ -355,7 +356,7 @@ void Controller::step(const ControlInput& in, float dt, ControlOutput& out)
             for (int i = 0; i < kNumJoints; ++i) { qRef[i] = in.q[i]; qdRef[i] = 0.0f; }
         } else if (!tracking_ && moveT_ >= moveDur_ && moveT_ - dt < moveDur_) {
             out.events |= EV_MOVE_DONE;
-            if (moveIsRest_) { setMode(Mode::Gravity); ramp_ = 1.0f; }   // parked: weightless again
+            if (moveIsRest_) setMode(Mode::Limp);      // parked: torque off, the arm settles onto its stops
         }
     }
 

@@ -8,7 +8,8 @@ simulation.
 - **Firmware for the Olimex ESP32-PoE.**
   - 250 Hz control loop on its own core, woken by a hardware timer, with a pipelined servo bus.
   - Gravity compensation, with friction compensation for holding and damping per joint.
-  - Hold in the servos' own position mode, and moves to a pose.
+  - Hold in the servos' own position mode, and moves to a pose. Rest parks the arm lying back, the way it rests limp,
+    and turns the torque off.
   - Calibration at the mechanical stops; settings in flash.
   - A strict boot: torque stays off until all seven servos answer.
   - Short servo dropouts ridden through; 200 ms of silence goes limp.

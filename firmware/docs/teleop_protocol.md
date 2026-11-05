@@ -51,7 +51,7 @@ The arm refuses changes that would surprise it while it works:
 | `status` | | Everything at a glance (see below). |
 | `mode` | `mode`: `limp`, `gravity`, `move` | `limp` always works and also stops teleoperation, calibration and replay. `gravity` and `move` need a calibrated arm, a passed model self-test and no fault. `move` holds the current pose. |
 | `move` | `q_deg`: 6 or 7 values (or `q` in rad), `speed_deg` optional (up to 180) | Smooth minimum-jerk move to the target, clamped to the joint ranges. Grabbing the arm during the move hands it back to GRAVITY. |
-| `rest` | | Move to the rest pose (forearm folded down, q3 = -70 deg). |
+| `rest` | | Move to the rest pose (J2 -82, J3 -80 deg, the rest 0: the arm lying back the way it rests limp), then go limp. |
 | `gravity_scale` | `value` 0 to 1.5 | Scales gravity compensation. 1 = real gravity. |
 | `hold_friction` | `value` 0 to 1 | Friction compensation (holding): extra push against gravity, as a share of the gravity load, because the servos' gears slip when gravity drives them. 0.3 on a new arm. `save` keeps it (settings blob v3). |
 | `hold_stiffness` | `value` 0.25 to 8 | Hold (MOVE) stiffness factor: K x value, D x its square root. 1 is nominal (1.5 Nm/rad on J1-J3). Not saved yet; status shows `hold_stiffness`. |
@@ -84,7 +84,7 @@ convention, or null), `engaged`, `hold`, `precision`, `locks`, `orient_lock`, `g
 | Command | Arguments | What it does |
 |---|---|---|
 | `spring` | `type` (`cable`, `torsion`, `none`), `k` 0..5000, `a_mm` and `b_mm` 0..100, `q0_deg`, `scale` 0..2 | Sets the J2 counterbalance model. For the zero-length cable: `k` in N/m, `a_mm` = anchor height above J2 (13), `b_mm` = eyelet distance up the upper arm (20). Rates of the federnshop set: 565, 718, 824, 1027 N/m. |
-| `auto_rest` | `on` true/false, `idle_s` 3..3600 | Moves to the rest pose after the arm was left alone in GRAVITY. Off by default. |
+| `auto_rest` | `on` true/false, `idle_s` 3..3600 | Moves to the rest pose after the arm was left alone in GRAVITY, then goes limp. Off by default. |
 
 ### Calibration (see `docs/calibration.md`)
 

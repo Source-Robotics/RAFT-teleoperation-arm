@@ -61,7 +61,7 @@ struct AutoRest {
     float stillSpeedRadS;     // "left alone": every joint slower than this ...
     float stillAngleRad;      // ... and none moved more than this since the timer started
     float speedRadS;          // speed of the rest move
-    float qRest[kNumJoints];  // low-load pose (default: forearm folded down, J2/J3 at ~95 mA)
+    float qRest[kNumJoints];  // parking pose (default: upper arm lying back near its stop, forearm folded down)
 };
 
 // Virtual fixture on the wrist centre (DH frame 4 origin: J4..J6 axes meet there, and with the scaled PAR6
@@ -166,7 +166,9 @@ public:
     bool moving() const { return mode_ == Mode::Move && (tracking_ || moveT_ < moveDur_); }
     // Start a smooth (minimum-jerk) joint move from the last measured q. speed <= 0 uses the default.
     // Targets are clamped to the soft limits. Returns false before the first step() (no q yet).
-    bool moveTo(const float qTarget[kNumJoints], float speedRadS = 0.0f);
+    // rest: the move to the rest pose. Its target is not clamped (with J2 lying back, J3 folds below the range it has
+    // at J2 = 0, which the CAD allows), and on arrival the arm goes limp and settles onto its stops.
+    bool moveTo(const float qTarget[kNumJoints], float speedRadS = 0.0f, bool rest = false);
     bool moveActive() const { return mode_ == Mode::Move && !tracking_ && moveT_ < moveDur_; }
     // Replay: MOVE follows this reference directly (call every tick; the grab abort still applies).
     bool track(const float q[kNumJoints], const float qd[kNumJoints]);

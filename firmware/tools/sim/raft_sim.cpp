@@ -286,17 +286,19 @@ void groupMove(Leader& L)
         L.run(0.3, ctl, nullptr, nullptr, true);
         const double i2a = 1e3 * L.bus.current[1], i3a = 1e3 * L.bus.current[2];
         const double t0 = L.time();
-        double tRest = -1, tPark = -1;
+        double tRest = -1, tPark = -1, err = 0;
         while (L.time() - t0 < 20.0 && (tPark < 0 || L.time() < tPark + 1.0)) {
             L.stepOnce(ctl, nullptr, nullptr, false, [](raft::ControlInput&) {},
                        [&](const raft::ControlInput&, const raft::ControlOutput& o) {
                            if ((o.events & raft::EV_AUTO_REST) && tRest < 0) tRest = L.time();
-                           if ((o.events & raft::EV_MOVE_DONE) && tPark < 0 && tRest > 0) tPark = L.time();
+                           if ((o.events & raft::EV_MOVE_DONE) && tPark < 0 && tRest > 0) {
+                               tPark = L.time();   // the pose error on arrival: after that the arm is limp (and the model has no stops)
+                               for (int i = 0; i < 7; ++i) err = std::fmax(err, std::fabs(L.arm.q(i) - c.autoRest.qRest[i]));
+                           }
                        });
         }
-        double err = 0; for (int i = 0; i < 7; ++i) err = std::fmax(err, std::fabs(L.arm.q(i) - c.autoRest.qRest[i]));
-        std::printf("  auto-rest: left alone at 'handle in front' -> rest move starts after %.1f s, parked %.1f s later, pose error %.2f deg, mode %s\n",
-                    tRest - t0, tPark - tRest, deg(err), ctl.mode() == raft::Mode::Gravity ? "GRAVITY" : "other");
+        std::printf("  auto-rest: left alone at 'handle in front' -> rest move starts after %.1f s, parked %.1f s later, pose error on arrival %.2f deg, then %s\n",
+                    tRest - t0, tPark - tRest, deg(err), ctl.mode() == raft::Mode::Limp ? "LIMP" : ctl.mode() == raft::Mode::Gravity ? "GRAVITY" : "other");
         std::printf("             J2 current %.0f -> %.0f mA, J3 %.0f -> %.0f mA\n", i2a, 1e3 * L.bus.current[1], i3a, 1e3 * L.bus.current[2]);
     }
 }

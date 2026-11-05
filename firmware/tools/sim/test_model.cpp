@@ -154,9 +154,15 @@ int main()
         check(started && std::fabs(k * 0.005f - 1.0f) < 0.02f && rc.mode() == raft::Mode::Move, "left alone 1 s -> automatic move to the rest pose");
         bool parked = false; k = 0;
         while (!parked && k < 2000) { rc.step(ri, 0.005f, out); for (int i = 0; i < 7; ++i) ri.q[i] = out.qRef[i]; parked = (out.events & raft::EV_MOVE_DONE) != 0; ++k; }
-        check(parked && rc.mode() == raft::Mode::Gravity && std::fabs(ri.q[2] + 1.2217f) < 1e-3f, "parks at the rest pose (forearm 70 deg down) and is weightless again");
+        check(parked && rc.mode() == raft::Mode::Limp && std::fabs(ri.q[1] + 1.4312f) < 1e-3f && std::fabs(ri.q[2] + 1.3963f) < 1e-3f,
+              "parks at the rest pose (J2 -82, J3 -80 deg: below J3's range, not clamped) and goes limp");
         for (int j = 0; j < 400; ++j) rc.step(ri, 0.005f, out);
-        check(rc.mode() == raft::Mode::Gravity, "does not re-trigger while parked");
+        check(rc.mode() == raft::Mode::Limp, "stays limp while parked (no new rest move)");
+        float far[raft::kNumJoints] = {0, 0, -2.0f, 0, 0, 0, 0};
+        rc.setMode(raft::Mode::Gravity); rc.moveTo(far, 0.0f);
+        bool done = false; k = 0;
+        while (!done && k < 4000) { rc.step(ri, 0.005f, out); for (int i = 0; i < 7; ++i) ri.q[i] = out.qRef[i]; done = (out.events & raft::EV_MOVE_DONE) != 0; ++k; }
+        check(done && std::fabs(ri.q[2] - ac.joint[2].qMinRad) < 1e-3f && rc.mode() == raft::Mode::Move, "an ordinary move is still clamped to the range and holds there");
     }
     {
         raft::Controller bc(raft::defaultControlConfig());

@@ -751,7 +751,7 @@ size_t App::handleCommandImpl(const char* line, char* out, size_t cap, double no
         float speed = 0.0f;
         if (json::getNumber(line, "speed_deg", v) && v > 0.0 && v <= 180.0) speed = (float)v * kPi / 180.0f;
         if (ctl_.mode() == Mode::Limp) ctl_.setMode(Mode::Gravity);
-        if (!ctl_.moveTo(q, speed)) return reply(out, cap, false, "\"error\": \"no joint state yet\"");
+        if (!ctl_.moveTo(q, speed, !strcmp(cmd, "rest"))) return reply(out, cap, false, "\"error\": \"no joint state yet\"");
         return reply(out, cap, true, "\"mode\": \"move\"");
     }
     if (!strcmp(cmd, "gravity_scale")) {

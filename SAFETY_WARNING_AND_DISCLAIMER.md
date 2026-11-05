@@ -28,7 +28,7 @@ RAFT is a small arm, but it is driven by servos under software control and it co
 - **Teleoperation moves PAR6.** PAR6 is a larger and stronger robot that follows the hand. Run it in a clear area,
   with its own E-stop within reach of you or a second person. A software or network fault on either side can make
   it move in a way you did not intend.
-- **Electrical.** The servos run from a 6 V supply that can deliver 5 A or more; use leads rated for it and a
+- **Electrical.** The servos run from a 5 to 7 V supply of 1.5 A or more; use leads rated for it and a
   supply with a current limit if you can. The ESP32-PoE without -ISO is not isolated: never connect USB while it is
   powered over Ethernet (PoE), and with PoE the servo supply's output must be floating. Plug and unplug servos
   only with the supply off.

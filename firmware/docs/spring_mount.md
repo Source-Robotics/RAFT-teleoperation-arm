@@ -34,8 +34,8 @@ bracket's frame). **CS3** = "Coordinate System3" (on the J3 axis, the upper arm'
    the arm through it and on to the anchor. It leaves the ring at up to 40.5 deg to either side (largest at
    J2 = +-50 deg, where the angle is asin(13/20); 36 deg on the Springs Online mount). A short ring with both
    edges rounded is enough, no pulley. Good parts: a ceramic snap-in thread-guide eyelet (alumina, about 2 mm
-   bore, pressed into a hole in the standoff), or a 2-3 mm slice of 2 x 4 mm PTFE Bowden tube pressed into a
-   4 mm hole with both ends countersunk. Not a long tube, which would bend the cable over its sharp end, and
+   bore, pressed into a hole in the standoff), a small screw eye pin (round wire loop, the BOM's) screwed into the
+   standoff, or a 2-3 mm slice of 2 x 4 mm PTFE Bowden tube pressed into a 4 mm hole with both ends countersunk. Not a long tube, which would bend the cable over its sharp end, and
    not a bare printed hole or a raw metal edge, which wear or fray the line. With a friction coefficient
    around 0.1 the ring changes the spring torque by about +-3.5 % depending on the direction of motion, at
    most about 6 mNm, well below the servo friction.
@@ -131,7 +131,8 @@ These are vertex-based estimates from the STL meshes. Print a test piece and che
 ## Joint ranges (estimated from the CAD, also in RAFT.urdf / RAFT.xml)
 
 J2 -105..+130 deg, J3 -75..+150 deg (at J2 = 0). Below J3 = -80 deg the wrist runs into the shoulder
-bracket and the base, so the folded "rest" pose is J3 = -70 deg.
+bracket and the base. With the upper arm lying back (J2 near -82 deg) the forearm folds further: the rest pose is
+J2 -82, J3 -80 deg.
 
 ## Firmware
 

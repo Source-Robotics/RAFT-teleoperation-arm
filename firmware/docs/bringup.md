@@ -55,7 +55,6 @@ Both at once is safe only because the Ethernet port gives no power: never USB to
 |---|---|
 | Olimex ESP32-PoE | Check that the metal can says ESP32-WROOM-32: the firmware's Ethernet setup assumes it (the WROVER version moves the Ethernet clock to GPIO0). |
 | TTLinker mini | Half-duplex bus adapter (74HC126), `datasheets/TTLINKER.pdf`. Its logic runs at 5 V: see 2.1. |
-| Two resistors, 1 kOhm and 2 kOhm | The voltage divider on the line into the ESP32 (2.2 k and 3.3 k work too). |
 | 6.0 V servo supply | A bench supply with a current limit is best; otherwise a 6 V adapter rated 5 A or more with a floating output. The servos are rated 4.5 to 7.4 V (torque figures at 6 V); the TTLinker needs at least 6 V for its 5 V regulator: use 6.0 to 6.5 V. |
 | Supply leads | 0.5 mm² (20 AWG) or thicker, with a switch in the + lead if the supply has none. |
 | Micro-USB cable | Power and serial console for the ESP32: flashing, the `set_id` tool, console commands. |
@@ -65,13 +64,13 @@ Both at once is safe only because the Ethernet port gives no power: never USB to
 
 ## 2. Wiring
 
-### 2.1 The one thing to fix first: 5 V on the ESP32's receive pin
+### 2.1 Signal levels
 
-The TTLinker's logic runs at 5 V, the ESP32's at 3.3 V, and the ESP32's pins are **not 5 V tolerant**.
+The TTLinker's logic runs at 5 V, the ESP32's at 3.3 V. Both signal lines are plain wires.
 
-- **TTLinker to ESP32 (RX0 to GPIO33).** The TTLinker drives this line to 5 V. Put a voltage divider in it:
-  TTLinker RX0, through 1 kOhm, to GPIO33, with 2 kOhm from GPIO33 to GND. GPIO33 then sees 3.3 V. Without the
-  divider it may work for a while and then damage the ESP32.
+- **TTLinker to ESP32 (RX0 to GPIO33).** The TTLinker drives this line to 5 V, above the ESP32's 3.3 V rating
+  (3.6 V at most). The first arm runs it this way. For margin, a divider brings it to 3.3 V: 1 kOhm from RX0 to
+  GPIO33 and 2 kOhm from GPIO33 to GND.
 - **ESP32 to TTLinker (GPIO32 to TX1).** 3.3 V into a 5 V 74HC chip is at the edge of what it reads as high: it
   usually works, but is not guaranteed. The scan in step 3 tells: every servo should answer 5 of 5 pings. If they
   do not, add a 74AHCT125 buffer (TTL-level input) powered from the TTLinker's 5 V pin, or use a level shifter
@@ -86,11 +85,7 @@ The servos themselves accept 2 to 5 V signals (HLS3606 datasheet), so only the a
   6.0 V supply (-) ---------------------------------> TTLinker GND <------ ESP32-PoE GND   (left header, pin 3)
 
   ESP32-PoE GPIO32 (right header) ------------------> TTLinker TX1        (ESP32 transmits)
-  TTLinker RX0 ----[1 kOhm]----+--------------------> ESP32-PoE GPIO33    (right header, ESP32 receives)
-                               |
-                            [2 kOhm]
-                               |
-                              GND
+  TTLinker RX0 -------------------------------------> ESP32-PoE GPIO33    (right header, ESP32 receives)
 
   TTLinker servo port (S V G) ---> J1 ---> J2 ---> ... ---> J7 (trigger)     all 7 on one bus
   TTLinker 5V pin: NOT connected (it is 150 mA at most, and the ESP32 has its own supply)
@@ -107,7 +102,7 @@ The servos themselves accept 2 to 5 V signals (HLS3606 datasheet), so only the a
 | Supply - | TTLinker GND | |
 | TTLinker GND | ESP32-PoE GND, left header pin 3 | Common ground: without it nothing works. |
 | ESP32-PoE GPIO32, right header | TTLinker TX1 | The TTLinker's pins are named after the Arduino pins they go to: TX1 takes the controller's TX. |
-| TTLinker RX0 | 1 kOhm, then ESP32-PoE GPIO33, right header; 2 kOhm from GPIO33 to GND | The divider from 2.1. |
+| TTLinker RX0 | ESP32-PoE GPIO33, right header | A plain wire. It carries 5 V: see 2.1. |
 | TTLinker servo port | J1 servo, then the chain to J7 | Servo cable (5264-3P): pin 1 GND, 2 Vcc, 3 signal. Plug and unplug servos only with the supply off. |
 | ESP32-PoE micro-USB | PC | |
 | ESP32-PoE Ethernet | network port without PoE | |
@@ -126,8 +121,6 @@ the Teleop page is the clutch, and **Resume** reclaims PAR6 after an outage.
 2. **No short.** With everything wired and the supply off, measure between Vcc and GND at a servo connector: no
    short (more than a few hundred ohms).
 3. **Ground.** Beep through from the supply's minus to the TTLinker GND and to the ESP32's GND pin.
-4. **Divider.** Unplug the wire into GPIO33 and switch the supply on: between the divider's middle and GND you
-   should read about 3.3 V (the TTLinker idles high). 5 V means the divider is wrong. Supply off, plug GPIO33 back.
 
 ## 3. Check the servo IDs
 
@@ -175,7 +168,7 @@ means both directions of the bus work.
    the J1 column may change. Then J2, and so on to the trigger. Enter stops it. If two joints are swapped (turning J3
    changes the J5 column), swap their IDs through a free one: `2` then `20`, `4` then `2`, `20` then `4`.
 
-If nothing answers at all: supply on, common ground, TX1 and RX0 not swapped, the divider (2.1, 2.5). If every servo
+If nothing answers at all: supply on, common ground, TX1 and RX0 not swapped (2.3, 2.5). If every servo
 is "unreliable": the GPIO32 note in 2.1.
 
 `t` measures every servo's reply time (see step 5). The tool leaves torque off. Type `x` when done; step 4 flashes the real firmware over it.
@@ -426,10 +419,10 @@ When you open an [issue](https://github.com/Source-Robotics/RAFT-teleoperation-a
 
 | You see | Usually means |
 |---|---|
-| The set_id scan finds nothing | Supply off, no common ground, TX1 / RX0 swapped, or the divider wrong. |
+| The set_id scan finds nothing | Supply off, no common ground, or TX1 / RX0 swapped. |
 | The scan marks a servo "unreliable" | One ID only: two servos probably share it (step 3, one at a time). Every servo: GPIO32's 3.3 V is at the edge of what the TTLinker reads as high (2.1); add the 74AHCT125 buffer. |
 | `BOOT HALTED: not all servos answer. Missing: J4_WristP (ID 3)` | No servo power, a loose bus cable, or a wrong ID. Check with the `set_id` tool's scan (step 3). The firmware retries for 10 s, then waits for a reset. |
-| All seven missing at boot | The same as the first row: supply, ground, TX / RX, divider. Or the servo supply came on after the 10 s: press reset. |
+| All seven missing at boot | The same as the first row: supply, ground, TX / RX. Or the servo supply came on after the 10 s: press reset. |
 | No "Network up" line appears | No DHCP lease. The arm runs and the serial console works for everything; the web UI needs a network with a DHCP server. |
 | failed reads > 0 every second, all servos present, mostly the last one (J7) | The SyncRead takes longer than the driver's 3 to 4 ms timeout. Measure with the ID tool's `t` command (step 3) and include the output; the timeout is the `syncTimeoutMs` default of `ServoBus::begin()` in `servo_bus.h`. |
 | overruns > 0 every second | Ticks come late: the Health page shows which part of the tick takes the time. |

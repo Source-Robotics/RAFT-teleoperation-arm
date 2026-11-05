@@ -17,7 +17,7 @@ Everything needed to build **one** RAFT arm. How it goes together: [`Assembly ma
 | Diameter / Type | Length | Quantity | Description | Link |
 |-----------------|--------|----------|-------------|------|
 | M2 | 4 or 5 mm | 33 | Printed parts to the servo horns, 4 per horn: 7 horns = 28, plus 5 spare | |
-| M3 | 8 mm | 12 | The lids, and the joint stops: a printed part stops against the screw at the joint's limit. 7 used, plus 5 spare | |
+| M3 | 8 mm | 15 | The lids (2 each on the Base, Shoulder and Elbow lids) and the 4 joint stops: a printed part stops against the screw at the joint's limit. 10 used, plus 5 spare | |
 | Servo screws | | come with the servos | Servo bodies into the printed parts, and each horn onto its servo | |
 
 ---
@@ -28,7 +28,6 @@ Everything needed to build **one** RAFT arm. How it goes together: [`Assembly ma
 |------|----------|-------------|------|
 | ESP32-POE | 1 | Motor controller. The WROOM-32 version (the firmware's Ethernet setup assumes it). Not the -ISO: never connect USB while it runs on PoE | [Link](https://www.olimex.com/Products/IoT/ESP32/ESP32-POE/open-source-hardware) |
 | TTLinker mini | 1 | Half-duplex bus adapter for the servos (74HC126, 5 V logic). Datasheet: [`datasheets/TTLINKER.pdf`](datasheets/TTLINKER.pdf) |  |
-| Resistors 1 kΩ + 2 kΩ | 1 each | Voltage divider on the line into the ESP32 (its pins are not 5 V tolerant); 2.2 k + 3.3 k work too |  |
 | Servo supply 6.0–6.5 V | 1 | Bench supply or adapter, 5 A or more, floating output. Current limit 4–5 A |  |
 | Supply leads, switch | 1 | 0.5 mm² (20 AWG) or thicker; the switch in the + lead is the hard stop |  |
 | PoE switch or injector (802.3af) | 1 | Powers the ESP32 over the network cable; or USB at the bench (then a network port without PoE) |  |

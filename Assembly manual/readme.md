@@ -75,7 +75,7 @@ servo's cable out toward the electronics.
 ![Step 2a](images/02a_shoulder.png)
 
 **2b.** Fit the J2 servo (ID 1) into the Shoulder, and its horn onto it. Screw in the M3 × 8 stop screw. Close the
-Shoulder with its lid.
+Shoulder with its lid and 2 × M3 × 8.
 
 ![Step 2b](images/02b_j2_servo.png)
 
@@ -88,7 +88,7 @@ Fix the lower end of the Upper arm to J2's horn with 4 × M2, standing vertical.
 ### 4. Elbow
 
 **4a.** Fit the J3 servo (ID 2) and the J4 servo (ID 3) into the Elbow, each with its horn. Screw in the M3 × 8 stop
-screw. Close the Elbow with its lid.
+screw. Close the Elbow with its lid and 2 × M3 × 8.
 
 ![Step 4a](images/04a_elbow_servos.png)
 
@@ -156,9 +156,7 @@ the checks before the first power-up, is in [bring-up step 2](../firmware/docs/b
 ```
   6.0 V supply (+) --[switch]--> TTLinker VIN          6.0 V supply (-) --> TTLinker GND --> ESP32-PoE GND
   ESP32-PoE GPIO32 ------------> TTLinker TX1
-  TTLinker RX0 --[1 kOhm]--+---> ESP32-PoE GPIO33      (2 kOhm from GPIO33 to GND: the ESP32 pins take 3.3 V only)
-                           |
-                        [2 kOhm]--> GND
+  TTLinker RX0 ----------------> ESP32-PoE GPIO33
   TTLinker servo port ---> J1 ---> J2 ---> J3 ---> J4 ---> J5 ---> J6 ---> J7 (trigger)
 ```
 

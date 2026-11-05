@@ -75,15 +75,15 @@ only goes past horizontal (90 deg) when reaching down, so 05 M is still fine for
 
 ## The AliExpress springs (ordered November 2026)
 
-0.8 mm wire, from [this listing](https://www.aliexpress.com/item/1005004052186320.html) (the 7 mm backup may come from
-another). The listing gives no rate, so the rates below are estimates from wire, diameter and length: the lower end is
-stainless, the upper end spring steel, and the viewer uses the middle. Measure them before fitting (below).
+0.8 mm stainless wire, from [this listing](https://www.aliexpress.com/item/1005004052186320.html) (packs of 5, 6 to 10 mm
+outside). The listing gives no rate, so the rates below are estimates for stainless from wire, diameter and length; the
+ratings are those of a comparable stainless spring (Lee Spring). Measure them before fitting (below).
 
 | Spring | Packs | Rate (estimate) | Balance | Pre-stretch at vertical | At the end of J2's range |
 |---|---:|---:|---:|---:|---|
-| 0.8 x 6 x 35 mm, the main one | 2 | 0.79-0.91 N/mm | 91-104 % | about 3.5 mm | about 104 % of the rated force in the last few degrees |
-| 0.8 x 6 x 40 mm, softer | 1 | 0.66-0.76 N/mm | 76-87 % | about 2.8 mm | within rating |
-| 0.8 x 7 x 30 mm, backup | 1 | 0.64-0.74 N/mm | 74-85 % | about 3.4 mm | within rating |
+| 0.8 x 6 x 35 mm, the main one | 2 | 0.79 N/mm | 91 % | about 3.2 mm | over that rating beyond J2 +-100 deg |
+| 0.8 x 6 x 40 mm, softer | 1 | 0.66 N/mm | 76 % | about 2.5 mm | within rating |
+| 0.8 x 7 x 30 mm, backup | 1 | 0.64 N/mm | 74 % | about 3.1 mm | over that rating beyond J2 +-116 deg |
 
 - **Pre-stretch** assumes an initial tension of about 3 N (2.5 N for the 7 mm). With the measured values it is
   7 - initial tension / rate, in mm: set the cable so the spring is stretched by that much with the upper arm vertical.
@@ -91,7 +91,7 @@ stainless, the upper end spring steel, and the viewer uses the middle. Measure t
   spring leaves about 1.3 mm to the bar (6 mm: 1.8 mm). The viewer does not check this gap. If you redesign the mount,
   making the post, the eyelet standoff and the spring pin 1 mm longer (cable plane at CS2 z = -34) gives either spring
   1 mm more.
-- **In the firmware,** start with `k` = 850, 710 or 690 N/m, then the measured rate, then `calib_spring` on the arm.
+- **In the firmware,** start with `k` = 790, 660 or 640 N/m, then the measured rate, then `calib_spring` on the arm.
 
 ## Any other spring (eBay, AliExpress, a hardware store)
 
@@ -135,5 +135,5 @@ bracket and the base, so the folded "rest" pose is J3 = -70 deg.
 
 ## Firmware
 
-`spring.type = ZeroLengthCable`, `spring.k` = rate in N/m (AliExpress estimates 850, 710 or 690 until measured; federnshop 565, 718, 824 or 1027; Lee Spring 1028, 821, 685, 683 or 585), `spring.a = 0.013`,
+`spring.type = ZeroLengthCable`, `spring.k` = rate in N/m (AliExpress estimates 790, 660 or 640 until measured; federnshop 565, 718, 824 or 1027; Lee Spring 1028, 821, 685, 683 or 585), `spring.a = 0.013`,
 `spring.b = 0.020` (Springs Online: 0.016 / 0.027), then trim `spring.scale` on the bench.

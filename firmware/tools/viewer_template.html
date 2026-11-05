@@ -580,12 +580,12 @@ const DATA = /*__RAFT_DATA__*/null;
   // All mount numbers in mm in DH frame 1: origin on the J2 axis, z1 along the J2 axis, up = -y1 at the
   // zero pose. The post rides on the shoulder bracket (joint2.frame = DH frame 1); the eyelet, pin and
   // spring ride on the upper arm (joint2.motion), whose axis points along -y.
-  // AliExpress springs (ordered 2026-11-02): rates estimated from wire, diameter and length (spring steel to stainless,
-  // the middle used), initial tension and rating assumed Lee-like. Measure them (docs/spring_mount.md) before trusting.
+  // AliExpress springs (ordered 2026-11-02, stainless per the listing): rates estimated for stainless from wire, diameter
+  // and length; initial tension and rating assumed like Lee Spring's stainless. Measure them (docs/spring_mount.md).
   const SPRINGS = [
-    { set: "ali", shop: "AliExpress", code: "6 x 35 main", d: 0.8, De: 6.0, L0: 35.0, R: 0.85, F0: 3.0, sn: 25.3, Fn: 24.5, price: "about EUR 3 a pack, ordered 2 packs", url: "https://www.aliexpress.com/item/1005004052186320.html" },
-    { set: "ali", shop: "AliExpress", code: "6 x 40 softer", d: 0.8, De: 6.0, L0: 40.0, R: 0.71, F0: 3.0, sn: 30.3, Fn: 24.5, price: "about EUR 3 a pack, ordered 1 pack", url: "https://www.aliexpress.com/item/1005004052186320.html" },
-    { set: "ali", shop: "AliExpress", code: "7 x 30 backup", d: 0.8, De: 7.0, L0: 30.0, R: 0.69, F0: 2.5, sn: 28.0, Fn: 21.8, price: "about EUR 3 a pack, ordered 1 pack", url: "https://www.aliexpress.com/w/wholesale-extension-spring-0.8mm-wire.html" },
+    { set: "ali", shop: "AliExpress", code: "6 x 35 main", d: 0.8, De: 6.0, L0: 35.0, R: 0.79, F0: 3.0, sn: 22.0, Fn: 20.4, price: "about EUR 3 for 5, ordered 2 packs", url: "https://www.aliexpress.com/item/1005004052186320.html" },
+    { set: "ali", shop: "AliExpress", code: "6 x 40 softer", d: 0.8, De: 6.0, L0: 40.0, R: 0.66, F0: 3.0, sn: 26.4, Fn: 20.4, price: "about EUR 3 for 5, ordered 1 pack", url: "https://www.aliexpress.com/item/1005004052186320.html" },
+    { set: "ali", shop: "AliExpress", code: "7 x 30 backup", d: 0.8, De: 7.0, L0: 30.0, R: 0.64, F0: 2.5, sn: 24.4, Fn: 18.1, price: "about EUR 3 for 5, ordered 1 pack", url: "https://www.aliexpress.com/item/1005004052186320.html" },
     { set: "fed", shop: "federnshop", code: "Z-075NI", d: 0.8, De: 6.0, L0: 50.0, R: 0.565, F0: 3.13, sn: 53.58, Fn: 33.4, price: "EUR 6.16", url: "https://www.federnshop.com/en/products/extension_springs/z-075ni.html" },
     { set: "fed", shop: "federnshop", code: "Z-078AI", d: 0.8, De: 5.8, L0: 45.1, R: 0.718, F0: 3.22, sn: 43.51, Fn: 34.46, price: "EUR 6.09", url: "https://www.federnshop.com/en/products/extension_springs/z-078ai.html" },
     { set: "fed", shop: "federnshop", code: "Z-078I", d: 0.8, De: 5.8, L0: 40.3, R: 0.824, F0: 3.23, sn: 37.9, Fn: 34.46, price: "EUR 5.98", url: "https://www.federnshop.com/en/products/extension_springs/z-078i.html" },

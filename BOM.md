@@ -11,7 +11,7 @@ Everything needed to build **one** RAFT arm. How it goes together: [`Assembly ma
 
 | Type | Quantity | Description | Link | Reference Image |
 |------|----------|-------------|------|-----------------|
-| FEETECH HLS3606M, 6 V, 6 kg·cm | 7 | J1 to J6 and the trigger, servo IDs 0 to 6. Each comes with its horn and screws. 20.6 g each, 25-tooth output, 15 cm lead with a 5264 3-pin plug (1 GND, 2 Vcc, 3 signal). Datasheet: [`datasheets/HL_3606_C001_datasheet.pdf`](datasheets/HL_3606_C001_datasheet.pdf) | [Link](https://s.click.aliexpress.com/e/_c3TR7Q47) | [Link](BOM%20reference%20images/HLS3606M_servo.jpg) |
+| FEETECH HLS3606M, 6 V, 6 kg·cm | 7 | J1 to J6 and the trigger, servo IDs 0 to 6. Each comes with its horn and screws. 20.6 g each, 25-tooth output, 15 cm lead with a 5264 3-pin plug (1 GND, 2 Vcc, 3 signal). Datasheet: [`datasheets/HL_3606_C001_datasheet.pdf`](datasheets/HL_3606_C001_datasheet.pdf) | [Link](https://www.aliexpress.com/item/1005010298067392.html) | [Link](BOM%20reference%20images/HLS3606M_servo.jpg) |
 
 ---
 
@@ -19,7 +19,7 @@ Everything needed to build **one** RAFT arm. How it goes together: [`Assembly ma
 
 | Diameter / Type | Length | Quantity | Description | Link |
 |-----------------|--------|----------|-------------|------|
-| M2 | 4 or 5 mm | 33 | Printed parts to the servo horns, 4 per horn: 7 horns = 28, plus 5 spare | |
+| M2 | 4 or 5 mm | 36 | Printed parts to the servo horns (4 per horn, 7 horns = 28) and the ESP32-PoE to the Base's three posts (3): 31 used, plus 5 spare | |
 | M3 | 8 mm | 15 | The lids (2 each on the Base, Shoulder and Elbow lids) and the 4 joint stops: a printed part stops against the screw at the joint's limit. 10 used, plus 5 spare | |
 | Servo screws | | come with the servos | Servo bodies into the printed parts, and each horn onto its servo | |
 
@@ -41,7 +41,7 @@ Everything needed to build **one** RAFT arm. How it goes together: [`Assembly ma
 
 | Type | Quantity | Description | Link | Reference Image |
 |------|----------|-------------|------|-----------------|
-| Extension spring | 1 | 0.8 mm wire, at most 7 mm wide, 0.55 to 1.05 N/mm, e.g. 0.8 × 6 × 35 mm. See [`firmware/docs/spring_mount.md`](firmware/docs/spring_mount.md) |  | [Link](BOM%20reference%20images/extension_spring.jpg) |
+| Extension spring | 1 | 0.8 mm stainless wire, 6 mm outside, 35 mm long: pick that variant (sold in packs of 5). The 40 mm one is the softer option. The listing gives no rate: about 0.79 N/mm, measure it before fitting ([`firmware/docs/spring_mount.md`](firmware/docs/spring_mount.md)) | [Link](https://www.aliexpress.com/item/1005004052186320.html?cn=%7B%22c%22%3A%22NgewdvyPA4UybATE1782475394%22%2C%22e%22%3A%221020%22%7D&aff_fcid=0a03354edfdb4792a4dc2c3c1de7bb6d-1793893871132-05974-6mia6uv&aff_fsk=6mia6uv&aff_platform=aaf&sk=6mia6uv&aff_trace_key=0a03354edfdb4792a4dc2c3c1de7bb6d-1793893871132-05974-6mia6uv&terminal_id=6f6a07bafed64133a81ef5a35dd2a6fa&afSmartRedirect=y) | [Link](BOM%20reference%20images/extension_spring.jpg) |
 | Dyneema cable 0.5 mm | 0.3 m | Runs from the spring over the eyelet to the anchor |  | [Link](BOM%20reference%20images/braided_line.jpg) |
 | Eyelet | 1 | Ceramic thread-guide ring or a short slice of PTFE tube |  | [Link](BOM%20reference%20images/eyelet.png) |
 

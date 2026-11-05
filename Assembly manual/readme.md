@@ -135,7 +135,7 @@ Fix the Gripper trigger to the trigger servo's horn with 4 × M2.
 ### 9. ESP32-PoE onto its three posts
 
 Lay the ESP32-PoE on the three posts of the Base plate, with its Ethernet jack at the plate's edge: its three mounting
-holes sit over the posts. Fix it to the posts.
+holes sit over the posts. Fix it to the posts with 3 × M2 (4 or 5 mm).
 
 ![Step 9](images/09_esp32.png)
 

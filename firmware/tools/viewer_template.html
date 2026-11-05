@@ -521,7 +521,12 @@ const DATA = /*__RAFT_DATA__*/null;
   // All mount numbers in mm in DH frame 1: origin on the J2 axis, z1 along the J2 axis, up = -y1 at the
   // zero pose. The post rides on the shoulder bracket (joint2.frame = DH frame 1); the eyelet, pin and
   // spring ride on the upper arm (joint2.motion), whose axis points along -y.
+  // AliExpress springs (ordered 2026-11-02): rates estimated from wire, diameter and length (spring steel to stainless,
+  // the middle used), initial tension and rating assumed Lee-like. Measure them (docs/spring_mount.md) before trusting.
   const SPRINGS = [
+    { set: "ali", shop: "AliExpress", code: "6 x 35 main", d: 0.8, De: 6.0, L0: 35.0, R: 0.85, F0: 3.0, sn: 25.3, Fn: 24.5, price: "about EUR 3 a pack, ordered 2 packs", url: "https://www.aliexpress.com/item/1005004052186320.html" },
+    { set: "ali", shop: "AliExpress", code: "6 x 40 softer", d: 0.8, De: 6.0, L0: 40.0, R: 0.71, F0: 3.0, sn: 30.3, Fn: 24.5, price: "about EUR 3 a pack, ordered 1 pack", url: "https://www.aliexpress.com/item/1005004052186320.html" },
+    { set: "ali", shop: "AliExpress", code: "7 x 30 backup", d: 0.8, De: 7.0, L0: 30.0, R: 0.69, F0: 2.5, sn: 28.0, Fn: 21.8, price: "about EUR 3 a pack, ordered 1 pack", url: "https://www.aliexpress.com/w/wholesale-extension-spring-0.8mm-wire.html" },
     { set: "fed", shop: "federnshop", code: "Z-075NI", d: 0.8, De: 6.0, L0: 50.0, R: 0.565, F0: 3.13, sn: 53.58, Fn: 33.4, price: "EUR 6.16", url: "https://www.federnshop.com/en/products/extension_springs/z-075ni.html" },
     { set: "fed", shop: "federnshop", code: "Z-078AI", d: 0.8, De: 5.8, L0: 45.1, R: 0.718, F0: 3.22, sn: 43.51, Fn: 34.46, price: "EUR 6.09", url: "https://www.federnshop.com/en/products/extension_springs/z-078ai.html" },
     { set: "fed", shop: "federnshop", code: "Z-078I", d: 0.8, De: 5.8, L0: 40.3, R: 0.824, F0: 3.23, sn: 37.9, Fn: 34.46, price: "EUR 5.98", url: "https://www.federnshop.com/en/products/extension_springs/z-078i.html" },
@@ -536,9 +541,9 @@ const DATA = /*__RAFT_DATA__*/null;
     { set: "so", shop: "Springs Online", code: "SOTRI0072", d: 1.0, De: 11.0, L0: 31.4, R: 0.53, F0: 3.61, sn: 39.6, Fn: 24.6, price: "EUR 2.93", url: "https://www.springsonline.net/it/sotri0072-molla-trazione-uni-8526-acciaio-inox.html" },
     { set: "so", shop: "Springs Online", code: "SOTR0072", d: 1.0, De: 11.0, L0: 31.4, R: 0.64, F0: 4.26, sn: 39.6, Fn: 29.6, price: "EUR 2.75", url: "https://www.springsonline.net/it/sotr0072-molla-trazione-uni-8526-acciaio-carbonio.html" },
   ];
-  const MOUNTS = { fed: { a: 13, b: 20, f: 101, z: -33, plate: 13.5 }, lee: { a: 13, b: 20, f: 101, z: -33, plate: 13.5 }, so: { a: 16, b: 27, f: 103, z: -35, plate: 13.5 } };
+  const MOUNTS = { ali: { a: 13, b: 20, f: 101, z: -33, plate: 13.5 }, fed: { a: 13, b: 20, f: 101, z: -33, plate: 13.5 }, lee: { a: 13, b: 20, f: 101, z: -33, plate: 13.5 }, so: { a: 16, b: 27, f: 103, z: -35, plate: 13.5 } };
   const BAR_FACE = -28.2, LINK1_FACE = -21.4, M_Q2 = 0.2269, EYE_MARGIN = 4, MM = 1e-3;
-  let springIdx = 2, mount = Object.assign({}, MOUNTS.fed), springOn = true;
+  let springIdx = 0, mount = Object.assign({}, MOUNTS.ali), springOn = true;
   const sp = { post: new THREE.Group(), arm: new THREE.Group() };
   const matPart = new THREE.MeshStandardMaterial({ color: 0x2f9e7a, roughness: 0.5, metalness: 0.1 });       // new printed parts
   const matMetal = new THREE.MeshStandardMaterial({ color: 0xa7b0b8, roughness: 0.35, metalness: 0.6 });
@@ -705,8 +710,8 @@ const DATA = /*__RAFT_DATA__*/null;
 
   // ---- UI
   const sel = document.getElementById("springSel");
-  const SET_LABEL = { fed: "federnshop.com (mount a 13 / b 20)", lee: "leespring.de (mount a 13 / b 20)", so: "springsonline.net (mount a 16 / b 27)" };
-  const SET_NOTE = { fed: " (business buyers only)", lee: " each, single pieces (EUR 15 fee below EUR 50 net)", so: " (excl. VAT)" };
+  const SET_LABEL = { ali: "AliExpress, your order (mount a 13 / b 20, rates estimated)", fed: "federnshop.com (mount a 13 / b 20)", lee: "leespring.de (mount a 13 / b 20)", so: "springsonline.net (mount a 16 / b 27)" };
+  const SET_NOTE = { ali: ". The rate is an estimate from the size: measure it with the water-bottle test (docs/spring_mount.md) and enter it with the spring command", fed: " (business buyers only)", lee: " each, single pieces (EUR 15 fee below EUR 50 net)", so: " (excl. VAT)" };
   let lastSet = "";
   for (const [i, s] of SPRINGS.entries()) {
     if (s.set !== lastSet) { const og = document.createElement("optgroup"); og.label = SET_LABEL[s.set]; sel.appendChild(og); lastSet = s.set; }

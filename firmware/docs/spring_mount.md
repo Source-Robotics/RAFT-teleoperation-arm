@@ -1,8 +1,8 @@
 # J2 spring mount: what to add to the CAD (layout v2)
 
 Zero-length cable balancer for J2. Interactive check: `docs/raft_viewer.html`, built by `python tools/build_viewer.py` (Spring view, "Sweep J2" /
-"Sweep J3"), built by `tools/build_viewer.py`. Numbers below are for the federnshop set; the Springs Online
-set needs the mount in brackets.
+"Sweep J3"). It opens with the AliExpress springs below selected. The mount is the same for the AliExpress, federnshop
+and Lee Spring springs; the Springs Online set needs the mount in brackets.
 
 ## Where everything goes
 
@@ -73,6 +73,26 @@ tension 3.25 N; it fits this mount as it is.
 Lee's maximum load (24.5 N, stainless 20.4 N) is lower than federnshop's 34.5 N for the same size. The upper arm
 only goes past horizontal (90 deg) when reaching down, so 05 M is still fine for testing.
 
+## The AliExpress springs (ordered November 2026)
+
+0.8 mm wire, from [this listing](https://www.aliexpress.com/item/1005004052186320.html) (the 7 mm backup may come from
+another). The listing gives no rate, so the rates below are estimates from wire, diameter and length: the lower end is
+stainless, the upper end spring steel, and the viewer uses the middle. Measure them before fitting (below).
+
+| Spring | Packs | Rate (estimate) | Balance | Pre-stretch at vertical | At the end of J2's range |
+|---|---:|---:|---:|---:|---|
+| 0.8 x 6 x 35 mm, the main one | 2 | 0.79-0.91 N/mm | 91-104 % | about 3.5 mm | about 104 % of the rated force in the last few degrees |
+| 0.8 x 6 x 40 mm, softer | 1 | 0.66-0.76 N/mm | 76-87 % | about 2.8 mm | within rating |
+| 0.8 x 7 x 30 mm, backup | 1 | 0.64-0.74 N/mm | 74-85 % | about 3.4 mm | within rating |
+
+- **Pre-stretch** assumes an initial tension of about 3 N (2.5 N for the 7 mm). With the measured values it is
+  7 - initial tension / rate, in mm: set the cable so the spring is stretched by that much with the upper arm vertical.
+- **The 7 mm spring is close to the bar.** The spring hangs on the cable plane, 4.8 mm outside the bar face, so a 7 mm
+  spring leaves about 1.3 mm to the bar (6 mm: 1.8 mm). The viewer does not check this gap. If you redesign the mount,
+  making the post, the eyelet standoff and the spring pin 1 mm longer (cable plane at CS2 z = -34) gives either spring
+  1 mm more.
+- **In the firmware,** start with `k` = 850, 710 or 690 N/m, then the measured rate, then `calib_spring` on the arm.
+
 ## Any other spring (eBay, AliExpress, a hardware store)
 
 A spring works on this mount when:
@@ -115,5 +135,5 @@ bracket and the base, so the folded "rest" pose is J3 = -70 deg.
 
 ## Firmware
 
-`spring.type = ZeroLengthCable`, `spring.k` = rate in N/m (565, 718, 824 or 1027; Lee Spring 1028, 821, 685, 683 or 585), `spring.a = 0.013`,
+`spring.type = ZeroLengthCable`, `spring.k` = rate in N/m (AliExpress estimates 850, 710 or 690 until measured; federnshop 565, 718, 824 or 1027; Lee Spring 1028, 821, 685, 683 or 585), `spring.a = 0.013`,
 `spring.b = 0.020` (Springs Online: 0.016 / 0.027), then trim `spring.scale` on the bench.

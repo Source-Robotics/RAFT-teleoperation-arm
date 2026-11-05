@@ -6,7 +6,8 @@
 // The ESP32 calls these from two cores with one mutex around them (main.cpp); the PC simulator calls them
 // from one thread against MuJoCo (tools/sim). Commands: docs/teleop_protocol.md.
 // Joint angles are unwrapped: a joint turned past +-180 deg keeps counting (the encoder reads one turn), so the
-// follower target never jumps by a turn. At power-up every joint is taken to be within half a turn of zero.
+// follower target never jumps by a turn. At power-up, and when a servo answers again after about 0.25 s of silence
+// (its supply was off, so the joint may have been turned by hand), a joint is taken to be within half a turn of zero.
 // Settings that change how torque is computed (signs, Kt, register unit, load, defaults) are accepted only
 // while limp; nothing that changes the calibration runs during teleoperation, a calibration or a replay.
 #pragma once

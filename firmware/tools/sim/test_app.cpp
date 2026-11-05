@@ -375,6 +375,16 @@ static void testCommandFlow()
         prev = q;
     }
     check(smooth && std::fabs(deg(app.lastInput().q[0]) - 228.5) < 0.2, "a joint turned through +-180 deg keeps counting (unwrapped, no jump)");
+    raw.ok[0] = false; tick(10); raw.ok[0] = true; tick(1);
+    check(std::fabs(deg(app.lastInput().q[0]) - 228.5) < 0.2, "after a short dropout a joint keeps its turn count");
+    // the servo supply switched off while the ESP32 runs on, J2 turned by hand from +100 to -100 deg meanwhile: read as
+    // -100 deg (within half a turn of zero, as at power-up), not +260 deg counted on from its last angle
+    auto j2 = [](int d) { return (int16_t)(((2048 + kJointDir[1] * d) % 4096 + 4096) % 4096); };
+    raw.pos[1] = j2(1138); tick(1);
+    const bool at100 = std::fabs(deg(app.lastInput().q[1]) - 100.0) < 0.2;
+    raw.ok[1] = false; tick(100);
+    raw.pos[1] = j2(-1138); raw.ok[1] = true; tick(1);
+    check(at100 && std::fabs(deg(app.lastInput().q[1]) + 100.0) < 0.2, "a servo back after a longer silence is read within half a turn of zero");
     app.handleCommand("{\"cmd\": \"bogus\"}", rep, sizeof(rep), t, nullptr);
     check(std::strstr(rep, "unknown cmd"), "unknown command is refused");
 }

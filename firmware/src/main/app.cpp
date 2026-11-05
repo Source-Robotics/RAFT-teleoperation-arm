@@ -22,6 +22,10 @@ const float kDeg = 180.0f / kPi;
 const int kMissingFault = 50;
 const int kMissingFaultCalib = 6;
 const int kMissingRefuse = 10;
+// A servo that answers again after this many missed reads in a row (about 0.25 s) may have been turned by hand in the
+// meantime (its supply was off): its angle is taken to be within half a turn of zero again, as at power-up, instead of
+// counting a turn from its last angle.
+const int kRewrapMissing = 63;
 const float kTempFaultC = 75.0f;     // derating ends at 70 C; this is the hard stop
 
 const char* modeName(Mode m)
@@ -296,6 +300,7 @@ void App::controlTick(const RawServoState& raw, double now, int16_t rawOut[kNumJ
     bool lost = false;
     const int faultAfter = cal_.active() ? kMissingFaultCalib : (torqueWasOn_ || stJoint_ >= 0) ? kMissingFault : 0;   // 0: limp, never
     for (int i = 0; i < kNumJoints; ++i) {
+        if (raw.ok[i] && missing_[i] >= kRewrapMissing) { haveWrap_[i] = false; turns_[i] = 0; }
         missing_[i] = raw.ok[i] ? 0 : (uint8_t)(missing_[i] < 255 ? missing_[i] + 1 : 255);
         if (!raw.ok[i]) ++missedTotal_[i];
         if (faultAfter && missing_[i] >= faultAfter) lost = true;

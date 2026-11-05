@@ -12,6 +12,8 @@ simulation.
   - Calibration at the mechanical stops; settings in flash.
   - A strict boot: torque stays off until all seven servos answer.
   - Short servo dropouts ridden through; 200 ms of silence goes limp.
+  - A servo that answers again after its supply was off is read within half a turn of zero, as at power-up, so a
+    joint turned by hand meanwhile is not a full turn off.
   - Updates over the network.
   - An arm name for several arms on one network: raft-*name*.local, and the name in the web UI's header and tab.
 - **Teleoperation of PAR6** through its RCB runtime, tested in simulation only, not yet on a real PAR6.

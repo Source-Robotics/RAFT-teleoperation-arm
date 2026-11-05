@@ -129,6 +129,7 @@ python examples/gravity_comp.py
 | Hardware: STEP and 3D print files, the robot description (`raft_description/`), BOM, photos | [CERN-OHL-S-2.0](LICENSE) |
 | Software: `firmware/`, `tools/`, `examples/` | [GPL-3.0](LICENSE-GPL-3.0) |
 | The Feetech servo driver bundled in `firmware/src/` (`HLSCL`, `SCS`, `SCSCL`, `SMS_STS`, `SCSerial`, `INST.h`, `SCServo.h`), from [FTServo_Arduino](https://github.com/ftservo/FTServo_Arduino), unchanged | [MIT](firmware/src/LICENSE-FTServo.txt), © 2024 ftservo |
+| The pictures in `BOM reference images/` (vendor photos and Wikimedia Commons) | Each its own, listed in [`BOM reference images/README.md`](BOM%20reference%20images/README.md) |
 
 RAFT's kinematics follow the PAROL6 / PAR6 arm by Source Robotics; the force-feedback leader idea comes from FACTR.
 

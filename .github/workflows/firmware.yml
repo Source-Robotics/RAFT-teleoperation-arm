@@ -1,0 +1,35 @@
+# ESP32 firmware checks.
+#   host-tests  the portable firmware code (controller, PAR6 link, application, web server) on Linux
+#   esp32       the PlatformIO build of env:main, platform pinned in platformio.ini
+name: firmware
+
+on:
+  push:
+    paths: ["firmware/**", ".github/workflows/firmware.yml"]
+  pull_request:
+    paths: ["firmware/**", ".github/workflows/firmware.yml"]
+
+jobs:
+  host-tests:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and run the host tests
+        run: sh firmware/tools/sim/build.sh --run
+
+  esp32:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: actions/cache@v4
+        with:
+          path: ~/.platformio
+          key: pio-${{ runner.os }}-${{ hashFiles('firmware/platformio.ini') }}
+      - name: Install PlatformIO Core
+        run: pip install "platformio==6.2.0"      # the version this firmware was built with
+      - name: Build env:main
+        working-directory: firmware
+        run: pio run -e main

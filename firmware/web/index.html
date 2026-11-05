@@ -1,0 +1,2519 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<title>RAFT leader</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23143952'/%3E%3Cpath d='M9 25V15l8-6 7 5' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3Ccircle cx='9' cy='15' r='2.6' fill='white'/%3E%3Ccircle cx='17' cy='9' r='2.6' fill='white'/%3E%3C/svg%3E">
+<!-- RAFT leader arm web UI. Served gzipped from the ESP32's flash (src/main/web_assets.h, made by
+     tools/build_web.py); talks to the firmware over one WebSocket (docs/web_ui.md). No external files: system
+     fonts only, so nothing extra sits in flash. Colours from the Source Robotics palette. -->
+<style>
+:root{--bg:#F5F5F5;--panel:#FFFFFF;--panel2:#FAFAFA;--sunken:#EEEFF1;--line:#E4E4E4;--line2:#D4D6DB;--text:#111216;--muted:#555865;--faint:#8A8D99;
+--nav:#143952;--navbg:rgba(20,57,82,.08);--primary:#143952;--onprimary:#FFFFFF;--focus:#143952;
+--ok:#37C6A5;--oktext:#127A62;--warn:#E8A33D;--warntext:#94600C;--badfill:#C8343A;--badtext:#B8272E;
+--sbar:#292B37;--sbartext:#F5F5F5;--sbarmuted:#A9ADB8;--view1:#FFFFFF;--view2:#E9ECEF;--hud:rgba(255,255,255,.88);
+--arm:#C4CAD2;--armd:#7B8491;--armh:#FFFFFF;--grid:rgba(41,43,55,.07);--grid2:rgba(41,43,55,.2);--shadow:rgba(17,18,22,.13);
+--mesh:#BFC5CD;--meshb:#6C7581;--meshacc:#143952;--ghostF:#2BB394;--ghostT:#E8A33D;--ax0:#C8343A;--ax1:#22A383;--ax2:#143952;
+--s0:#143952;--s1:#E8A33D;--s2:#37C6A5;--s3:#6E5E9B;--s4:#C8343A;--s5:#91BCD6;--s6:#292B37;--cardsh:0 1px 2px rgba(17,18,22,.05);
+--sans:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+--mono:ui-monospace,"Cascadia Mono","SF Mono",Menlo,Consolas,"Roboto Mono",monospace;color-scheme:light}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#111216;--panel:#1A1C22;--panel2:#1E2027;--sunken:#14161B;--line:#2A2D36;--line2:#373B46;--text:#F5F5F5;--muted:#A7ABB6;--faint:#757A88;
+--nav:#91BCD6;--navbg:rgba(145,188,214,.12);--primary:#91BCD6;--onprimary:#111216;--focus:#91BCD6;--ok:#37C6A5;--oktext:#37C6A5;--warn:#E8A33D;--warntext:#E8A33D;--badfill:#D03A3A;--badtext:#EF5552;
+--sbar:#0B0C0F;--sbartext:#E4E4E4;--sbarmuted:#8B90A0;--view1:#20232B;--view2:#111216;--hud:rgba(26,28,34,.84);
+--arm:#3C4250;--armd:#1B1E25;--armh:#A9B6C8;--grid:rgba(200,210,225,.07);--grid2:rgba(200,210,225,.2);--shadow:rgba(0,0,0,.35);
+--mesh:#6B7486;--meshb:#2E3440;--meshacc:#91BCD6;--ghostF:#37C6A5;--ghostT:#E8A33D;--ax0:#EF5552;--ax1:#37C6A5;--ax2:#91BCD6;
+--s0:#91BCD6;--s1:#E8A33D;--s2:#37C6A5;--s3:#A99BD6;--s4:#EF5552;--s5:#5E8CB0;--s6:#E4E4E4;--cardsh:none;color-scheme:dark}}
+:root[data-theme=dark]{--bg:#111216;--panel:#1A1C22;--panel2:#1E2027;--sunken:#14161B;--line:#2A2D36;--line2:#373B46;--text:#F5F5F5;--muted:#A7ABB6;--faint:#757A88;
+--nav:#91BCD6;--navbg:rgba(145,188,214,.12);--primary:#91BCD6;--onprimary:#111216;--focus:#91BCD6;--ok:#37C6A5;--oktext:#37C6A5;--warn:#E8A33D;--warntext:#E8A33D;--badfill:#D03A3A;--badtext:#EF5552;
+--sbar:#0B0C0F;--sbartext:#E4E4E4;--sbarmuted:#8B90A0;--view1:#20232B;--view2:#111216;--hud:rgba(26,28,34,.84);
+--arm:#3C4250;--armd:#1B1E25;--armh:#A9B6C8;--grid:rgba(200,210,225,.07);--grid2:rgba(200,210,225,.2);--shadow:rgba(0,0,0,.35);
+--mesh:#6B7486;--meshb:#2E3440;--meshacc:#91BCD6;--ghostF:#37C6A5;--ghostT:#E8A33D;--ax0:#EF5552;--ax1:#37C6A5;--ax2:#91BCD6;
+--s0:#91BCD6;--s1:#E8A33D;--s2:#37C6A5;--s3:#A99BD6;--s4:#EF5552;--s5:#5E8CB0;--s6:#E4E4E4;--cardsh:none;color-scheme:dark}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{background:var(--bg);color:var(--text);font:13.5px/1.45 var(--sans);-webkit-font-smoothing:antialiased}
+.num,.mono,code,kbd{font-family:var(--mono);font-variant-numeric:tabular-nums}
+button,input,select{font:inherit;color:inherit}
+[hidden]{display:none!important}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.app{display:grid;grid-template-rows:auto auto minmax(0,1fr) auto;height:100vh;height:100dvh}
+.app>header{grid-row:1}.app>.banner{grid-row:2}.app>.cols{grid-row:3}.app>.sbar{grid-row:4}
+/* header */
+header.top{display:flex;align-items:center;gap:12px;height:52px;padding:0 14px 0 16px;background:var(--panel);border-bottom:1px solid var(--line);min-width:0}
+.brand{display:flex;align-items:center;gap:9px;color:var(--text);text-decoration:none;flex:none}
+.brand b{font-weight:800;letter-spacing:.16em;font-size:15px}.brand small{color:var(--muted);font-size:12px}
+.mark{width:26px;height:26px;flex:none}.mark rect{fill:var(--primary)}.mark path{fill:none;stroke:var(--onprimary);stroke-width:3;stroke-linecap:round;stroke-linejoin:round}.mark circle{fill:var(--onprimary)}
+.conn{display:inline-flex;align-items:center;gap:7px;height:28px;padding:0 11px;border-radius:99px;border:1px solid var(--line);background:var(--panel2);font-size:12px;color:var(--muted);white-space:nowrap;flex:none}
+.conn .host{color:var(--faint)}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--faint);flex:none}
+.dot.live{background:var(--ok);box-shadow:0 0 0 3px rgba(55,198,165,.22)}.dot.wait{background:var(--warn)}.dot.bad{background:var(--badfill)}
+.search{flex:0 1 340px;display:flex;align-items:center;gap:8px;height:32px;padding:0 6px 0 10px;border-radius:9px;border:1px solid var(--line);background:var(--sunken);color:var(--faint);cursor:pointer;min-width:0}
+.search:hover{border-color:var(--line2);color:var(--muted)}
+.search svg{width:16px;height:16px;flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round}
+.search .ph{flex:1;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+kbd{font-size:10.5px;padding:1px 6px;border-radius:5px;border:1px solid var(--line2);background:var(--panel);color:var(--muted);font-weight:600}
+.chips{display:flex;gap:6px;flex:1 1 auto;min-width:0;overflow:hidden;justify-content:flex-end}
+.chip{display:inline-flex;align-items:center;height:22px;padding:0 9px;border-radius:99px;font-size:11px;font-weight:700;letter-spacing:.05em;white-space:nowrap;background:var(--sunken);color:var(--muted);border:1px solid var(--line)}
+.chip.ok{background:var(--ok);color:#0B2A23;border-color:transparent}.chip.warn{background:var(--warn);color:#2E1F04;border-color:transparent}
+.chip.bad{background:var(--badfill);color:#fff;border-color:transparent}.chip.nav{background:var(--navbg);color:var(--nav);border-color:transparent}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:32px;padding:0 12px;border-radius:8px;border:1px solid var(--line2);background:var(--panel);font-weight:600;font-size:13px;cursor:pointer;white-space:nowrap;transition:background .12s,border-color .12s,color .12s}
+.btn:hover{border-color:var(--nav)}.btn:active{transform:translateY(1px)}
+.btn.primary{background:var(--primary);border-color:transparent;color:var(--onprimary)}.btn.primary:hover{filter:brightness(1.12)}
+.btn.danger{background:var(--badfill);border-color:transparent;color:#fff}
+.btn.ghost{background:transparent;border-color:transparent;color:var(--muted)}.btn.ghost:hover{background:var(--sunken);color:var(--text)}
+.btn.held{background:var(--warn);border-color:transparent;color:#2E1F04}
+.btn.sm{height:26px;padding:0 9px;font-size:12px;border-radius:7px}.btn.big{height:40px;font-size:14px;padding:0 16px}
+.btn[disabled]{opacity:.42;cursor:not-allowed}
+.limp{height:36px;padding:0 16px;font-weight:800;letter-spacing:.14em;flex:none}
+.limp kbd{background:rgba(255,255,255,.16);border-color:rgba(255,255,255,.3);color:#fff}
+.banner{display:none;align-items:center;gap:12px;padding:8px 16px;background:var(--badfill);color:#fff;font-weight:600}
+.banner.show{display:flex}.banner .btn{height:28px;background:rgba(255,255,255,.18);border-color:rgba(255,255,255,.32);color:#fff}
+/* the three columns */
+.cols{display:grid;grid-template-columns:208px minmax(0,1fr) 420px;min-height:0}
+.cols.wp{grid-template-columns:208px minmax(0,1fr)}.cols.wp .insp,.cols.wp .stage{display:none}.cols.wp .wide{display:block}
+.nav{background:var(--panel);border-right:1px solid var(--line);padding:8px 10px 14px;overflow:auto;display:flex;flex-direction:column;gap:2px;min-height:0}
+.nav .grp{font-size:10.5px;font-weight:700;letter-spacing:.12em;color:var(--faint);padding:14px 10px 5px}
+.nav button{display:flex;align-items:center;gap:10px;height:34px;padding:0 10px;border:0;border-radius:8px;background:none;color:var(--muted);font-weight:550;cursor:pointer;text-align:left;position:relative;white-space:nowrap}
+.nav button:hover{background:var(--sunken);color:var(--text)}
+.nav button.on{background:var(--navbg);color:var(--nav);font-weight:650}
+.nav button.on::before{content:"";position:absolute;left:-10px;top:7px;bottom:7px;width:3px;border-radius:0 3px 3px 0;background:var(--nav)}
+.nav svg{width:18px;height:18px;flex:none;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.nav .lbl{flex:1}
+.nb{height:18px;padding:0 6px;border-radius:99px;font-size:10px;font-weight:700;letter-spacing:.04em;display:inline-flex;align-items:center;background:var(--warn);color:#2E1F04}
+.nb.ok{background:var(--ok);color:#0B2A23}.nb.dotonly{width:8px;height:8px;padding:0}
+.navfoot{margin-top:auto;padding:14px 10px 0;font-size:11px;color:var(--faint);line-height:1.45;word-break:break-word}
+.work{min-width:0;min-height:0;display:flex;flex-direction:column;overflow:hidden}
+.stage{flex:1;min-height:0;display:flex;flex-direction:column;gap:12px;padding:12px}
+.wide{display:none;flex:1;min-height:0;overflow:auto;padding:12px}
+.view{flex:1;min-height:220px;display:flex;flex-direction:column;background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden;box-shadow:var(--cardsh)}
+.vbar{display:flex;align-items:center;gap:10px;height:42px;padding:0 10px 0 14px;border-bottom:1px solid var(--line);flex:none;min-width:0}
+.vt{font-weight:650}
+.canvas{position:relative;flex:1;min-height:0;background:radial-gradient(120% 100% at 50% 0%,var(--view1),var(--view2) 78%)}
+#gl,#cv{position:absolute;inset:0;width:100%;height:100%;display:block}
+#gl{pointer-events:none}#cv{touch-action:none;cursor:grab}#cv:active{cursor:grabbing}
+.hud{position:absolute;padding:8px 10px;border-radius:10px;background:var(--hud);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border:1px solid var(--line);font-size:12px}
+.hud.tl{top:10px;left:10px}.hud.bl{bottom:10px;left:10px;color:var(--muted);font-size:11px;cursor:help}.hud.br{bottom:10px;right:10px;max-width:300px}
+.hud .t{color:var(--muted);font-size:10.5px;font-weight:700;letter-spacing:.08em}
+.pgrid{display:grid;grid-template-columns:auto 1fr auto 1fr auto 1fr 26px;gap:3px 6px;align-items:baseline;margin-top:5px}
+.pgrid .k{color:var(--muted);font-size:10.5px;font-weight:700;letter-spacing:.04em}.pgrid>.k:not(:nth-child(7n+1)){padding-left:8px}
+.pgrid .k.ax0{color:var(--ax0)}.pgrid .k.ax1{color:var(--ax1)}.pgrid .k.ax2{color:var(--ax2)}
+.pgrid .num{text-align:right;font-size:12.5px;min-width:6ch}.pgrid .u{color:var(--faint);font-size:10.5px}
+.dock{flex:none;height:290px;display:flex;flex-direction:column;background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden;position:relative;box-shadow:var(--cardsh)}
+.dock.min{height:41px!important}
+.grip{position:absolute;left:0;right:0;top:-7px;height:10px;cursor:ns-resize;z-index:2}
+.dtabs{display:flex;align-items:center;gap:2px;height:40px;padding:0 6px 0 8px;border-bottom:1px solid var(--line);flex:none;min-width:0}
+.dtabs [data-d]{height:40px;padding:0 12px;border:0;border-bottom:2px solid transparent;background:none;color:var(--muted);font-weight:600;cursor:pointer;white-space:nowrap}
+.dtabs [data-d]:hover{color:var(--text)}.dtabs [data-d].on{color:var(--text);border-bottom-color:var(--nav)}
+.dtabs select{height:26px;font-size:12px}
+.dpane{flex:1;min-height:0;overflow:auto}
+#dockToggle svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;transition:transform .15s}.dock.min #dockToggle svg{transform:rotate(180deg)}
+.insp{background:var(--panel);border-left:1px solid var(--line);overflow:auto;min-height:0}
+.ihead{position:sticky;top:0;z-index:2;display:flex;align-items:baseline;gap:10px;padding:14px 18px 12px;background:var(--panel);border-bottom:1px solid var(--line)}
+.ihead h2,.phead h2{margin:0;font-size:16px;font-weight:700}.ihead span,.phead span{color:var(--muted);font-size:12px}
+.phead{grid-column:1/-1;display:flex;align-items:baseline;gap:10px;padding:2px 4px 0}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px;min-width:0;box-shadow:var(--cardsh)}
+.insp .card{border:0;border-bottom:1px solid var(--line);border-radius:0;padding:14px 18px 16px;box-shadow:none}
+.card h3{display:flex;align-items:center;gap:8px;margin:0 0 10px;min-height:22px;font-size:11.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.card h3>span:first-child{flex:1}
+.card h3 .btn,.card h3 select{text-transform:none;letter-spacing:0}
+.help{display:none;margin:10px 0 0;font-size:12.5px;color:var(--muted)}.help b{color:var(--text)}
+.card.helpon .help,.allhelp .help{display:block}
+.qh{width:20px;height:20px;border-radius:50%;border:1px solid var(--line2);background:none;color:var(--faint);font-size:11px;font-weight:700;cursor:pointer;flex:none;padding:0}
+.qh:hover,.card.helpon .qh{color:var(--nav);border-color:var(--nav)}
+.card.flash{animation:flash 1.4s ease-out}@keyframes flash{0%,30%{box-shadow:inset 0 0 0 2px var(--nav)}100%{box-shadow:inset 0 0 0 2px transparent}}
+.wide .page{display:grid;grid-template-columns:repeat(auto-fill,minmax(380px,1fr));gap:12px;align-content:start}
+.full{grid-column:1/-1}
+.hint{margin:9px 0 0;font-size:12.5px;color:var(--muted)}
+.row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.row+.row{margin-top:9px}
+.grow{flex:1}.muted{color:var(--muted)}.small{font-size:12.5px}.right{text-align:right}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:5px 14px;margin:10px 0 0;font-size:12.5px}
+.kv dt{color:var(--muted)}.kv dd{margin:0;text-align:right;word-break:break-word}
+input[type=text],input[type=number],select{height:30px;padding:0 9px;border-radius:7px;border:1px solid var(--line2);background:var(--panel);min-width:0}
+input[type=text]:focus,input[type=number]:focus,select:focus{outline:2px solid var(--focus);outline-offset:-1px}
+input[type=range]{width:100%;accent-color:var(--nav);margin:0;height:20px}
+input[type=checkbox]{accent-color:var(--nav);width:16px;height:16px;margin:0}
+label{display:inline-flex;align-items:center;gap:7px}
+.field+.field{margin-top:14px}
+.fl{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:3px}
+.fl b{font-weight:600}
+.scale{display:flex;justify-content:space-between;font-size:11px;color:var(--faint);margin-top:2px}
+.seg{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:3px;padding:3px;background:var(--sunken);border:1px solid var(--line);border-radius:10px}
+.seg button{height:32px;border:0;border-radius:7px;background:transparent;color:var(--muted);font-weight:650;cursor:pointer;padding:0 6px}
+.seg button:hover{color:var(--text)}
+.seg button.on{background:var(--panel);color:var(--nav);box-shadow:0 1px 2px rgba(17,18,22,.14),inset 0 0 0 1px var(--line2)}
+.seg button.on[data-m=limp]{color:var(--text)}
+.seg.big button{height:42px;font-size:14px}
+.seg.xs{padding:2px;gap:2px;border-radius:7px;flex:none}.seg.xs button{height:24px;padding:0 8px;font-size:11px;letter-spacing:.04em;border-radius:5px}
+.tog{font-size:12px;color:var(--muted)}
+/* tables */
+.tblwrap{overflow-x:auto}
+.tbl{border-collapse:collapse;width:100%;font-size:12px}
+.tbl.num,.kv dd.num{font-family:var(--sans);font-variant-numeric:tabular-nums}.jtab.num{font-family:var(--mono)}
+.tbl th,.tbl td{padding:6px 8px;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap}
+.tbl th{color:var(--muted);font-weight:600;font-size:11px;background:var(--panel)}
+.tbl thead th{position:sticky;top:0;z-index:1}
+.tbl th:first-child,.tbl td:first-child{text-align:left}
+.tbl tr.w td{color:var(--warntext)}
+.tbl td small{color:var(--muted);font-family:var(--sans);margin-left:6px}
+.jtab td{padding:4px 8px;height:30px}.jtab th{padding:6px 8px;line-height:1.2;vertical-align:bottom}.jtab th small{display:block;font-weight:500;color:var(--faint);font-family:var(--sans);margin:0}
+.jtab tbody tr:hover td{background:var(--panel2)}
+.rbar{position:relative;display:inline-block;width:80px;height:6px;border-radius:3px;background:var(--sunken);vertical-align:middle}
+.rbar i{position:absolute;top:-3px;width:4px;height:12px;margin-left:-2px;border-radius:2px;background:var(--nav)}
+.rbar b{position:absolute;top:-2px;width:1px;height:10px;background:var(--faint)}
+.ibar{position:relative;display:inline-block;width:60px;height:8px;border-radius:4px;background:var(--sunken);vertical-align:middle;margin-right:8px;overflow:hidden}
+.ibar i{position:absolute;left:0;top:0;bottom:0;width:0;background:var(--nav);border-radius:4px}.ibar i.w{background:var(--warn)}.ibar i.h{background:var(--badfill)}
+.ibar b{position:absolute;top:0;bottom:0;left:26.9%;width:2px;background:var(--muted)}
+.tc{display:inline-block;min-width:34px;padding:0 6px;border-radius:5px;text-align:center}
+.tc.w{background:var(--warn);color:#2E1F04}.tc.h{background:var(--badfill);color:#fff}
+.miss{color:var(--warntext);font-weight:600}
+/* drive */
+.pj{display:grid;grid-template-columns:44px 1fr 1fr;gap:6px 10px;align-items:center;font-size:12.5px}
+.pj .hd{font-size:11px;color:var(--muted);font-weight:600}
+.pj input{width:100%;height:28px}
+.mv{display:grid;grid-template-columns:28px 1fr 56px;gap:8px;align-items:center;font-size:12.5px}.mv+.mv{margin-top:6px}
+/* calibrate */
+.step{border:1px solid var(--line);border-radius:10px;background:var(--panel);margin-top:8px}
+.step>summary{list-style:none;display:flex;align-items:center;gap:10px;padding:10px 12px;cursor:pointer;font-weight:600}
+.step>summary::-webkit-details-marker{display:none}
+.step>summary .st{margin-left:auto;font-size:11.5px;color:var(--muted);font-weight:600}
+.step .n{flex:none;width:24px;height:24px;border-radius:50%;display:grid;place-items:center;font-size:12px;font-weight:800;background:var(--sunken);border:1px solid var(--line2);color:var(--muted)}
+.step.done .n{background:var(--ok);color:#0B2A23;border-color:transparent}.step.now .n{background:var(--primary);color:var(--onprimary);border-color:transparent}
+.step.now{border-color:var(--nav)}
+.step .body{padding:0 12px 12px 46px;color:var(--muted);font-size:12.5px}.step .body b{color:var(--text)}.step .body p{margin:0 0 10px}
+.jgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.jgrid .btn{height:34px;padding:0 6px}.jgrid .btn.done{border-color:var(--ok);color:var(--oktext)}
+.jgrid .btn.cur{border-color:var(--nav);box-shadow:0 0 0 1px var(--nav) inset}
+.stopnow{border:1px solid var(--line2);border-radius:10px;background:var(--sunken);padding:10px 12px;margin:0 0 10px;color:var(--text);font-size:13.5px}
+.stopnow.run{border-color:var(--nav)}
+.bar{height:6px;border-radius:3px;background:var(--sunken);overflow:hidden;margin-top:9px}
+.bar i{display:block;height:100%;width:35%;background:var(--nav);animation:ind 1.2s ease-in-out infinite}
+@keyframes ind{0%{margin-left:-35%}100%{margin-left:100%}}
+/* teleop */
+.pipe{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:12px}
+.pipe span{display:flex;flex-direction:column;gap:6px;font-size:10.5px;font-weight:700;letter-spacing:.06em;color:var(--faint)}
+.pipe span::before{content:"";height:5px;border-radius:3px;background:var(--sunken)}
+.pipe span.done{color:var(--muted)}.pipe span.done::before{background:var(--nav)}
+.pipe span.cur{color:var(--nav)}.pipe span.cur::before{background:linear-gradient(90deg,var(--nav) 55%,var(--sunken) 55%)}
+.pipe.coupled span{color:var(--oktext)}.pipe.coupled span::before{background:var(--ok)}
+.note{margin-top:10px;padding:9px 11px;border-radius:9px;background:rgba(232,163,61,.14);border:1px solid rgba(232,163,61,.45);font-size:12.5px}
+.locks{display:flex;gap:6px;flex-wrap:wrap}
+.locks label{height:28px;padding:0 9px;border-radius:7px;border:1px solid var(--line2);font-size:12px;cursor:pointer}
+.locks label:has(input:checked){border-color:var(--nav);background:var(--navbg);color:var(--nav)}
+.lk{width:72px;color:var(--muted);font-size:12.5px}
+/* health */
+.tiles{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px}
+.tile{display:flex;flex-direction:column;gap:1px;padding:9px 11px;border-radius:10px;background:var(--panel2);border:1px solid var(--line);min-width:0}
+.tile .k{font-size:10.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
+.tile .v{font-size:20px;font-weight:650;line-height:1.25}.tile .u{font-size:11px;color:var(--faint);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tile.w .v{color:var(--warntext)}.tile.h .v{color:var(--badtext)}
+.tline{margin-top:14px}
+.budget{position:relative;display:flex;height:14px;border-radius:4px;background:var(--sunken);box-shadow:inset 0 0 0 1px var(--line);overflow:hidden}
+.budget i{display:block;height:100%}.budget b{position:absolute;top:0;bottom:0;width:2px;background:var(--text)}
+.axis{position:relative;height:16px;font-size:10.5px;color:var(--faint);margin-top:2px}.axis span{position:absolute;transform:translateX(-50%);white-space:nowrap}.axis span:first-child{transform:none}.axis span:last-child{transform:translateX(-100%)}
+.legend{display:flex;gap:12px;flex-wrap:wrap;font-size:11.5px;color:var(--muted);margin-top:6px}.legend i{display:inline-block;width:10px;height:3px;border-radius:2px;margin-right:5px;vertical-align:3px}
+.chart{width:100%;height:170px;display:block;border-radius:8px;background:var(--panel2);border:1px solid var(--line)}
+.chart.tall{height:380px}
+.load{display:grid;grid-template-columns:54px 1fr 50px;gap:10px;align-items:center;font-size:12.5px}.load+.load{margin-top:8px}
+.lbar{position:relative;height:10px;border-radius:5px;background:var(--sunken);overflow:hidden}
+.lbar i{position:absolute;left:0;top:0;bottom:0;width:0;background:var(--nav);border-radius:5px;transition:width .2s}.lbar i.w{background:var(--warn)}.lbar i.h{background:var(--badfill)}
+.raw{margin:10px 0 0;padding:8px 10px;font-size:11.5px;white-space:pre;overflow-x:auto;background:var(--sunken);border:1px solid var(--line);border-radius:8px}
+.notes{margin:10px 0 0;padding-left:18px;font-size:12.5px}.notes li+li{margin-top:3px}
+/* console */
+.log{font-size:12px;padding:4px 12px 6px}
+.log div{white-space:pre-wrap;word-break:break-all;padding:3px 0;border-bottom:1px dashed var(--line)}
+.log .o{color:var(--nav)}.log .bad{color:var(--badtext)}.log .ev{color:var(--s3)}.log .okk{color:var(--oktext)}
+.log time{color:var(--faint);margin-right:8px}
+.conrow{display:flex;gap:8px;padding:8px 10px;border-top:1px solid var(--line);background:var(--panel)}
+#d-con{display:flex;flex-direction:column}#d-con .log{flex:1;overflow:auto;min-height:0}
+/* status bar */
+.sbar{display:flex;align-items:stretch;height:28px;padding:0 4px;background:var(--sbar);color:var(--sbarmuted);font-size:11.5px;overflow-x:auto;white-space:nowrap;scrollbar-width:none;cursor:pointer;border:0;width:100%;text-align:left}
+.sbar::-webkit-scrollbar{display:none}
+.sb{display:inline-flex;align-items:center;gap:5px;padding:0 10px;border-right:1px solid rgba(255,255,255,.07)}
+.sb:last-child{border-right:0}.sb.grow{flex:1;border-right:0}
+.sbar b{color:var(--sbartext);font-weight:600;font-family:var(--mono)}.sbar b.w{color:#F2B95A}.sbar b.h{color:#FF7A77}
+/* toasts, dialogs */
+#toasts{position:fixed;right:16px;bottom:42px;display:flex;flex-direction:column;gap:8px;z-index:40;max-width:min(380px,calc(100vw - 32px));pointer-events:none}
+.toast{padding:10px 12px;border-radius:10px;background:var(--panel);border:1px solid var(--line2);border-left:3px solid var(--nav);box-shadow:0 12px 30px var(--shadow);font-size:13px;animation:tin .18s ease-out;pointer-events:auto}
+.toast.ok{border-left-color:var(--ok)}.toast.bad{border-left-color:var(--badfill)}.toast.warn{border-left-color:var(--warn)}
+@keyframes tin{from{transform:translateY(8px);opacity:0}}
+.modal{position:fixed;inset:0;z-index:30;background:rgba(17,18,22,.4);display:flex;align-items:flex-start;justify-content:center;padding:12vh 16px 16px}
+.pal,.mbox{width:min(640px,100%);background:var(--panel);border:1px solid var(--line2);border-radius:14px;box-shadow:0 24px 60px rgba(0,0,0,.3);overflow:hidden}
+.pal input{width:100%;height:52px;border:0;border-bottom:1px solid var(--line);border-radius:0;padding:0 18px;font-size:15px;background:none;outline:none}
+.pal ul{list-style:none;margin:0;padding:6px;max-height:52vh;overflow:auto}
+.pal li{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:8px;cursor:pointer}
+.pal li.on{background:var(--navbg);color:var(--nav)}
+.pal li small{margin-left:auto;color:var(--faint);font-size:11.5px;white-space:nowrap}
+.pal li code{font-size:12px}
+.pal .foot,.mbox .foot{display:flex;gap:14px;flex-wrap:wrap;padding:9px 14px;border-top:1px solid var(--line);font-size:11.5px;color:var(--faint)}
+.mbox{width:min(460px,100%)}.mbox p{margin:0;padding:18px 18px 16px;font-size:14px}.mbox .foot{justify-content:flex-end}
+/* narrower screens */
+@media (max-width:1279px){.cols{grid-template-columns:60px minmax(0,1fr) 380px}.cols.wp{grid-template-columns:60px minmax(0,1fr)}
+.nav{padding:8px}.nav .grp{font-size:0;padding:0;height:1px;background:var(--line);margin:8px 6px}.nav .lbl,.nav .nb,.navfoot{display:none}
+.nav button{justify-content:center;padding:0}.nav button.on::before{left:-8px}.brand small{display:none}.search{flex-basis:230px}
+.tiles{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media (max-width:1023px){.app{display:block;height:auto}.cols,.cols.wp{display:flex;flex-direction:column}
+.work,.stage{display:contents}.nav{order:0}.view{order:1;margin:10px 10px 0}.insp{order:2}.dock{order:3;margin:10px}.wide{order:1}
+header.top{position:sticky;top:0;z-index:7}
+.nav{position:sticky;top:52px;z-index:6;flex-direction:row;overflow-x:auto;padding:6px 8px;border-right:0;border-bottom:1px solid var(--line);scrollbar-width:none}
+.nav::-webkit-scrollbar{display:none}.nav .grp{display:none}.nav .lbl{display:inline}.nav .nb{display:inline-flex}
+.nav button{flex:none;padding:0 12px;justify-content:flex-start}.nav button.on::before{display:none}
+.wide{padding:10px}.view{flex:none;height:56vh;height:56dvh;min-height:300px}.dock{height:auto!important}.dock .dpane{max-height:360px}
+.insp{border-left:0;border-top:1px solid var(--line);overflow:visible}.ihead{position:static}.wide{overflow:visible}.wide .page{grid-template-columns:minmax(0,1fr)}
+.sbar{flex-wrap:wrap;height:auto;padding:4px}.sb{padding:3px 9px}.grip{display:none}}
+@media (max-width:640px){header.top{gap:8px;padding:0 10px}.brand small,.conn .host,.search .ph,.search kbd,#saveTop,.limp kbd{display:none}
+.search{flex:0 0 36px;justify-content:center;padding:0}.conn{padding:0 9px}.view{height:46vh;height:46dvh}
+.vt{display:none}.vbar{gap:6px;padding:0 8px}
+.tiles{grid-template-columns:repeat(2,minmax(0,1fr))}.pgrid{grid-template-columns:auto 1fr auto 1fr auto 1fr}.pgrid .u{display:none}}
+</style>
+</head>
+<body>
+<div class="app">
+<header class="top">
+  <a class="brand" href="#" id="brand" title="RAFT leader arm"><svg class="mark" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8"/><path d="M9 25V15l8-6 7 5"/><circle cx="9" cy="15" r="2.6"/><circle cx="17" cy="9" r="2.6"/></svg><b>RAFT</b><small id="brandSub">leader arm</small></a>
+  <span class="conn" id="conn"><i class="dot" id="cDot"></i><span id="cConnT">connecting</span><span class="host num" id="cHost"></span></span>
+  <button class="search" id="openK" title="Search settings and commands (Ctrl K)"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><span class="ph">Search settings and commands</span><kbd>Ctrl K</kbd></button>
+  <div class="chips" id="chips">
+    <span class="chip ok" id="cCoupled" hidden>COUPLED</span>
+    <span class="chip warn" id="cDerate" hidden>DERATING</span>
+    <span class="chip warn" id="cCalib" hidden>CALIBRATING</span>
+    <span class="chip bad" id="cModel" hidden>MODEL FAILED</span>
+  </div>
+  <button class="btn ghost" id="saveTop" title="Save the settings to the arm's flash">All saved</button>
+  <button class="btn danger limp" id="limp" title="Switch torque off (Esc)">LIMP <kbd>Esc</kbd></button>
+</header>
+<div class="banner" id="banner"><span>Fault:</span><span id="faultT" class="grow"></span><button class="btn" id="faultClear">Clear fault</button></div>
+<div class="cols" id="body">
+  <nav class="nav" id="nav" aria-label="Pages">
+    <div class="grp">OPERATE</div>
+    <button data-p="drive" title="Drive"><svg viewBox="0 0 24 24"><path d="M12 3v18M3 12h18M9 6l3-3 3 3M9 18l3 3 3-3M6 9l-3 3 3 3M18 9l3 3-3 3"/></svg><span class="lbl">Drive</span></button>
+    <button data-p="tele" title="Teleop"><svg viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg><span class="lbl">Teleop</span><span class="nb" id="navTele" hidden></span></button>
+    <div class="grp">SET UP</div>
+    <button data-p="cal" title="Calibrate"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg><span class="lbl">Calibrate</span><span class="nb dotonly" id="navCal" hidden></span></button>
+    <button data-p="servos" title="Servos"><svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/><path d="M9 2v4M15 2v4M9 18v4M15 18v4M2 9h4M2 15h4M18 9h4M18 15h4"/></svg><span class="lbl">Servos</span></button>
+    <button data-p="set" title="Settings"><svg viewBox="0 0 24 24"><path d="M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1"/><circle cx="15" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="18" r="2"/></svg><span class="lbl">Settings</span><span class="nb dotonly" id="navSet" hidden title="unsaved changes"></span></button>
+    <div class="grp">DIAGNOSE</div>
+    <button data-p="plots" title="Plots"><svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="M7 15l4-5 3 3 5-7"/></svg><span class="lbl">Plots</span></button>
+    <button data-p="health" title="Health"><svg viewBox="0 0 24 24"><path d="M3 12h4l2-6 4 12 2-6h6"/></svg><span class="lbl">Health</span><span class="nb" id="navHealth" hidden></span></button>
+    <button data-p="con" title="Console"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 9l3 3-3 3M12 15h5"/></svg><span class="lbl">Console</span></button>
+    <div class="navfoot" id="navFoot"></div>
+  </nav>
+  <main class="work">
+    <section class="stage" id="stage">
+      <div class="view">
+        <div class="vbar">
+          <span class="vt">3D view</span>
+          <div class="seg xs" id="cams"><button data-view="iso" title="Reset view (double-click)">3D</button><button data-view="side">Side</button><button data-view="front">Front</button><button data-view="top">Top</button></div>
+          <span class="grow"></span>
+          <label class="tog" title="Show the PAR6 follower as a see-through arm"><input type="checkbox" id="showFol"> PAR6</label>
+          <div class="seg xs" id="units" title="Angle unit"><button data-u="deg">DEG</button><button data-u="rad">RAD</button></div>
+        </div>
+        <div class="canvas">
+          <canvas id="gl" aria-hidden="true"></canvas>
+          <canvas id="cv" aria-label="3D view of the arm"></canvas>
+          <div class="hud tl" id="pose">
+            <span class="t">TOOL POINT</span>
+            <div class="pgrid">
+              <span class="k ax0">X</span><span class="num" id="pp0">-</span><span class="k ax1">Y</span><span class="num" id="pp1">-</span><span class="k ax2">Z</span><span class="num" id="pp2">-</span><span class="u">mm</span>
+              <span class="k">Rx</span><span class="num" id="pp3">-</span><span class="k">Ry</span><span class="num" id="pp4">-</span><span class="k">Rz</span><span class="num" id="pp5">-</span><span class="u aU">deg</span>
+            </div>
+          </div>
+          <div class="hud bl num" id="hView" title="View: how often this page redrew the arm in the last second (only when something changed). Data: live frames from the arm per second (Settings, Live rate). Age: how old the pose on screen is on average: half the best round trip, plus how late frames arrive, plus half the time between two frames.">-</div>
+          <div class="hud br" id="simCard" hidden>
+            <span class="t">SIMULATOR HAND</span>
+            <div class="row" style="margin-top:6px"><button class="btn sm" data-hand="hold">Hold here</button><button class="btn sm" data-hand="zero">Hold at zero</button><button class="btn sm" data-hand="free">Let go</button></div>
+            <div class="row"><label class="small"><input type="checkbox" id="grabMode"> Drag pulls the arm</label><span class="small muted">or Shift-drag</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="dock" id="dock">
+        <div class="grip" id="dockGrip" title="Drag to resize"></div>
+        <div class="dtabs" role="tablist">
+          <button data-d="joints">Joints</button><button data-d="plot">Live plot</button><button data-d="con">Console</button>
+          <span class="grow"></span>
+          <select id="chSel" title="What the live plot shows"><option value="q">Joint angles</option><option value="qd">Joint speeds</option><option value="tcp">Tool point position</option>
+            <option value="cur">Current J2 / J3</option><option value="meas">Measured current</option><option value="tau">Torque J2 / J3</option><option value="volt">Supply voltage</option><option value="temp">Temperatures</option></select>
+          <button class="btn sm ghost" id="dockToggle" title="Hide or show this panel"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
+        </div>
+        <div class="dpane" id="d-joints"><div class="tblwrap"><table class="tbl jtab num" id="jtab"></table></div></div>
+        <div class="dpane" id="d-plot" hidden style="padding:8px 12px 10px"><canvas class="chart" id="chart" style="height:calc(100% - 26px);min-height:140px"></canvas><div class="legend" id="chLegend"></div></div>
+        <div class="dpane" id="d-con" hidden><div class="log mono" id="log"></div>
+          <div class="conrow"><input type="text" id="conIn" class="mono grow" placeholder='status   or   {"cmd": "move", "q_deg": [0,20,20,0,0,0,0]}' autocomplete="off" spellcheck="false"><button class="btn primary" id="conSend">Send</button></div></div>
+      </div>
+    </section>
+
+    <section class="wide" id="wide">
+      <div class="page" id="p-plots" hidden>
+        <div class="phead"><h2>Plots</h2><span>A 250 Hz capture recorded on the arm, and filters computed on it. The live plot is in the panel under the 3D view.</span></div>
+        <div class="card full"><h3><span>250 Hz capture and filters</span><span class="chip" id="scState">none yet</span></h3>
+          <div class="row"><button class="btn primary" id="scGo">Capture 2 s</button>
+            <label class="small">Joint <select id="scJ"><option value="0">J1</option><option value="1">J2</option><option value="2">J3</option><option value="3">J4</option><option value="4">J5</option><option value="5">J6</option><option value="6">J7 trigger</option></select></label>
+            <label class="small">Show <select id="scSig"><option value="q">angle</option><option value="qd">speed</option><option value="cur">current (measured)</option><option value="trq">torque (measured x Kt)</option></select></label>
+            <label class="small">Filter A <input type="number" id="scA" value="25" min="0" max="110" step="5" style="width:64px"> Hz</label>
+            <label class="small">B <input type="number" id="scB" value="50" min="0" max="110" step="5" style="width:64px"> Hz</label>
+            <label class="small">Window <select id="scWin"><option value="2">all</option><option value="0.5">0.5 s</option><option value="0.2">0.2 s</option><option value="0.1">0.1 s</option></select></label>
+            <input type="range" id="scPos" min="0" max="1" step="0.001" value="0" class="grow" style="width:auto;min-width:120px" title="Where the window sits in the capture"></div>
+          <canvas class="chart tall" id="scChart" style="margin-top:12px"></canvas><div class="legend" id="scLeg"></div>
+          <dl class="kv" id="scKv"></dl>
+          <p class="help">Records every control tick on the arm for 2 s: the leader's angles and speeds, and the target sent to PAR6 while teleoperating. Filters A and B are the firmware's target filter (Teleop, Filter: a 2nd-order Butterworth at 250 Hz), computed here on the same 250 Hz data, so cutoffs can be compared before choosing one. Move the arm by hand while it records, or hold it still to see the encoder's 0.088° steps.</p>
+        </div>
+      </div>
+
+      <div class="page" id="p-health" hidden>
+        <div class="phead"><h2>Health</h2><span id="hSub">The control loop, the servo bus, the processor and the network, from the arm's one-second windows.</span></div>
+        <div class="card full"><h3><span>Control loop</span><span class="chip" id="hlState">-</span></h3>
+          <div class="tiles">
+            <div class="tile" id="hlT0"><span class="k">Rate</span><span class="v num" id="hlHz">-</span><span class="u" id="hlHzU">Hz</span></div>
+            <div class="tile" id="hlT1"><span class="k">Period</span><span class="v num" id="hlPer">-</span><span class="u" id="hlPerU">ms mean</span></div>
+            <div class="tile" id="hlT2"><span class="k">Jitter</span><span class="v num" id="hlJit">-</span><span class="u" id="hlJitU">rms</span></div>
+            <div class="tile" id="hlT3"><span class="k">Tick work</span><span class="v num" id="hlWork">-</span><span class="u" id="hlWorkU">ms mean</span></div>
+            <div class="tile" id="hlT4"><span class="k">Late ticks</span><span class="v num" id="hlOver">-</span><span class="u" id="hlOverU">last s</span></div>
+            <div class="tile" id="hlT5"><span class="k">Failed reads</span><span class="v num" id="hlFail">-</span><span class="u" id="hlFailU">last s</span></div>
+          </div>
+          <div class="tline"><div class="small muted" style="margin-bottom:5px">One tick, mean of the last second (the bar marks the longest)</div>
+            <div class="budget" id="hlBud"><i></i><i></i><i></i><i></i><b id="hlBudMax" hidden></b></div><div class="axis num" id="hlAxis"></div></div>
+          <div class="legend" id="hlLeg"></div>
+          <div class="row" style="align-items:flex-start;gap:18px;margin-top:6px">
+            <dl class="kv grow" id="hlKv" style="min-width:280px"></dl>
+            <div class="grow" style="min-width:300px"><canvas class="chart" id="hlChart" style="margin-top:10px"></canvas>
+              <div class="legend"><span><i style="background:var(--s0)"></i>longest period</span><span><i style="background:var(--s1)"></i>longest tick work</span><span><i style="background:var(--faint)"></i>period</span><span>each second, last 2 min</span></div></div>
+          </div>
+        </div>
+        <div class="card"><h3><span>Servo bus</span></h3>
+          <div class="tblwrap"><table class="tbl num" id="hbTbl"></table></div>
+          <p class="help">Missed: ticks in which that servo's position is old, per second over the last 10 s and since the arm started (after the retry below).</p>
+        </div>
+        <div class="card"><h3><span>Processor and memory</span></h3>
+          <div class="load"><b>Core 0</b><div class="lbar"><i id="hmC0"></i></div><span class="num right" id="hmC0v">-</span></div>
+          <div class="load"><b>Core 1</b><div class="lbar"><i id="hmC1"></i></div><span class="num right" id="hmC1v">-</span></div>
+          <dl class="kv" id="hmKv"></dl>
+          <p class="help">Core 0 runs the network and this page, core 1 the control loop. The servo read waits for the replies by polling the bus, so most of it counts as busy on core 1.</p>
+        </div>
+        <div class="card"><h3><span>Network</span></h3><dl class="kv" id="hnKv" style="margin-top:0"></dl>
+          <p class="help">Live data delay: from the control tick that measured a frame to this page, estimated as half the best round trip plus how much later than the quickest frame it arrived. The page asks the arm only for what is on screen: live frames at the chosen rate (5 a second on Plots and Health), the status when it changes, and these health figures once a second.</p>
+        </div>
+        <div class="card full"><h3><span>Bus diagnosis</span><span class="chip" id="bdState">-</span></h3>
+          <div class="row small muted" id="bdFull"></div>
+          <div class="row" id="bdPollRow"><span class="small muted">Voltage, temperature, current: each servo every</span><select id="bdPoll"><option value="112">0.1 s</option><option value="500">0.5 s</option><option value="2000">2 s</option><option value="5000">5 s</option></select><span class="small muted">(not saved)</span></div>
+          <div class="row"><label class="small"><input type="checkbox" id="bdRetry"> Ask a missing servo again in the same tick</label><span class="grow"></span><button class="btn sm" id="bdTrace">Trace 20 s</button><button class="btn sm ghost" id="bdRaw">Raw bytes</button></div>
+          <div class="tblwrap" style="margin-top:8px"><table class="tbl num" id="bdTbl"></table></div>
+          <pre class="raw mono" id="bdOut" hidden></pre>
+          <p class="help">Per servo since the start, raw SyncRead misses (before the retry). <b>Silent</b>: nothing came from it, it did not hear the request or could not answer. <b>Garbled</b>: bytes came but not a valid reply: noise or a damaged signal. <b>Gaps</b>: how many reads in a row it missed, 1 / 2-5 / 6+. The arm rides through gaps on the last angle; with torque on, 50 in a row (0.2 s) trip the fault. <b>Flags</b>: the servo's own error byte in valid replies. <b>Retry</b>: answered when asked again. Move the wrist slowly through its range while watching: misses that follow a pose point at a cable.</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <aside class="insp" id="insp">
+    <div class="ihead"><h2 id="iTitle">Drive</h2><span id="iSub"></span></div>
+
+    <div class="page" id="p-drive">
+      <div class="card"><h3><span>Mode</span></h3>
+        <div class="seg big" id="modes"><button data-m="limp">Limp</button><button data-m="gravity">Gravity</button><button data-m="move">Hold</button></div>
+        <p class="hint" id="modeHint">-</p>
+      </div>
+      <div class="card"><h3><span>Compensation</span></h3>
+        <div class="field"><div class="fl"><span>Gravity</span><b class="num" id="gsV">1.00</b></div>
+          <input type="range" id="gs" min="0" max="1.5" step="0.01" value="1"><div class="scale"><span>0 sags</span><span>1.00 real gravity</span><span>1.50</span></div></div>
+        <div class="field"><div class="fl"><span>Friction (holding)</span><b class="num" id="hfV">0.30</b></div>
+          <input type="range" id="hf" min="0" max="1" step="0.01" value="0.3"><div class="scale"><span>0 off</span><span>0.30 default</span><span>1</span></div></div>
+        <p class="help">Friction (holding) is an extra push against gravity, as a share of the gravity load: the servos' gears slip easily when gravity drives them, so gravity alone lets the arm sink. Raise it if joints sink, lower it if they creep up. Save keeps both.</p>
+      </div>
+      <div class="card"><h3><span>Hold</span></h3>
+        <div class="field"><div class="fl"><span>Stiffness</span><b class="num"><span id="hkV">1.0</span>×</b></div>
+          <input type="range" id="hk" min="0.25" max="8" step="0.25" value="1"><div class="scale"><span>0.25 soft</span><span>1 = 1.5 Nm/rad (J1-J3)</span><span>8</span></div></div>
+        <div class="row small" style="margin-top:12px"><label><input type="checkbox" id="hpos"> Use the servos' own position mode (stiff, full current; also moves and replay)</label></div>
+        <p class="hint" id="hposNow" hidden></p>
+        <p class="help">How hard Hold pushes back toward its pose. Raise it in steps; if a joint starts to buzz or oscillate, go back one step. Not saved yet. With the servos' position mode on, the stiffness only applies to a joint near its encoder's wrap point.</p>
+      </div>
+      <div class="card"><h3><span>Per joint (Gravity mode)</span></h3>
+        <div class="pj" id="pj"><span class="hd">Joint</span><span class="hd">Gravity ×</span><span class="hd">Damping Nm·s/rad</span></div>
+        <p class="help"><b>Gravity factor</b>: on top of the gravity compensation, for a joint whose load the CAD misses (it speeds up as it slides). Raise in 0.1 steps until it stays; lower it if it creeps the other way. <b>Damping</b>: a gentle brake on a joint that keeps coasting after you let go. Defaults J5 0.03, J6 0.02, trigger 0.035 (arm_design.h); too much makes it feel sticky. Changes here are not saved.</p>
+      </div>
+      <div class="card"><h3><span>Move to</span><button class="btn sm ghost" id="mvCopy">Copy current pose</button></h3>
+        <div id="mvSliders"></div>
+        <div class="row" style="margin-top:12px"><span class="small muted">Speed</span><input type="range" id="mvSpeed" min="5" max="60" value="25" class="grow" style="width:auto"><span class="num small" id="mvSpeedV">25°/s</span></div>
+        <div class="row"><button class="btn primary" id="mvGo">Move</button><button class="btn" id="mvZero">Standby pose</button><button class="btn" id="mvRest">Rest pose</button><button class="btn ghost" id="mvClear" hidden>Hide target</button></div>
+        <p class="help">The amber see-through arm in the view is the target while you edit. Grabbing the arm during a move hands it back to gravity mode.</p>
+      </div>
+    </div>
+
+    <div class="page" id="p-tele" hidden>
+      <div class="card"><h3><span>PAR6 follower</span><span class="chip" id="tStage">OFF</span></h3>
+        <div class="row"><input type="text" id="piHost" placeholder="par6.local or 192.168.1.20" class="grow"><button class="btn primary" id="tStart">Start</button><button class="btn" id="tStop">Stop</button></div>
+        <div class="pipe" id="pipe"><span>PAIR</span><span>ALIGN</span><span>CLAIM</span><span>COUPLED</span></div>
+        <div class="note" id="tNote" hidden></div>
+        <div class="row" style="margin-top:12px"><button class="btn big grow" id="tHold" title="Keep PAR6 still while you reposition the leader">Hold PAR6</button><button class="btn big" id="tRealign">Realign</button><button class="btn big primary" id="tResume" hidden>Resume</button></div>
+        <div class="row"><label class="small" id="tOffL"><input type="checkbox" id="tOffset"> Couple with an offset when PAR6 is outside RAFT's range</label></div>
+        <p class="help">The PAR6 must allow this arm's address (RCB_ALLOWED_IPS). Pairing only reads; the leader moves itself onto the follower's pose before it claims control. Hold PAR6 keeps PAR6 still while you reposition the leader; Release hold carries on from there. Realign moves the leader back onto PAR6 and removes the offset. After a lost link, Resume reclaims.</p>
+      </div>
+      <div class="card"><h3><span>Link</span></h3>
+        <div class="row"><span class="lk">Link</span><select id="tRate" class="grow"><option value="250">Real RTI, 250 Hz (one target per PAR6 tick)</option>
+          <option value="50">SOFT_RTI 50 Hz</option><option value="25">SOFT_RTI 25 Hz</option><option value="10">SOFT_RTI 10 Hz</option></select></div>
+        <div class="row"><span class="lk">Filter</span><input type="number" id="tFilt" min="0" max="110" step="5" style="width:76px"><span class="small muted">Hz, 0 = off</span><span class="small muted" id="tFiltLag"></span></div>
+        <dl class="kv"><dt>Link</dt><dd id="tLink" class="num">-</dd><dt>Last error</dt><dd id="tErr">-</dd><dt>Coupling error</dt><dd id="tCoup" class="num">-</dd>
+          <dt>Offset</dt><dd id="tOff" class="num">-</dd><dt>Engaged</dt><dd id="tEng">-</dd><dt>Buttons</dt><dd id="tBtn">-</dd><dt>Dropped packets</dt><dd id="tStale" class="num">-</dd></dl>
+        <p class="help">Real RTI sends PAR6 one target per 4 ms tick, as it asks (40 ms without one and it stops); SOFT_RTI sends fewer and PAR6 fills in between, with more lag. Chosen before Start; not saved yet (it goes back to SOFT_RTI 50 Hz at a restart). The filter is a low-pass on the targets sent: it smooths the encoder steps and the hand's tremor and costs lag, about 230 / Hz ms (25 Hz: 9 ms).</p>
+      </div>
+      <div class="card"><h3><span>Assist</span></h3>
+        <div class="row"><span class="lk">Precision</span><input type="range" id="tPrec" min="0.05" max="1" step="0.05" value="1" class="grow" style="width:auto"><span class="num small" id="tPrecV">1.00</span></div>
+        <div class="row"><span class="lk">Lock</span><span id="tLocks" class="locks"></span></div>
+        <div class="row"><span class="lk">Guide</span><select id="tGuide" class="grow"><option value="none">none</option><option value="plane_h">horizontal plane</option><option value="plane_tool">plane across the tool axis</option><option value="axis_tool">line along the tool axis</option><option value="axis_z">vertical line</option></select></div>
+        <div class="row"><label class="small"><input type="checkbox" id="tOri"> Keep the handle's orientation</label></div>
+        <dl class="kv"><dt>PAR6 t_ext</dt><dd id="tExt" class="num">-</dd><dt>Gripper</dt><dd id="tGrip" class="num">-</dd><dt>Passivity credit</dt><dd id="tPc" class="num">-</dd></dl>
+        <p class="help">Precision: PAR6 moves this fraction of the leader's motion. A locked joint keeps PAR6's joint still. Orientation and guide are springs on the leader that keep the handle level or on a plane or line (the wrist centre); PAR6 follows the leader.</p>
+      </div>
+      <div class="card"><h3><span>Leader stream (UDP)</span></h3>
+        <dl class="kv" style="margin-top:0"><dt>Sending to</dt><dd id="stTarget" class="num">-</dd></dl>
+        <div class="row" style="margin-top:10px"><span class="small muted">Port</span><input type="number" id="stPort" value="5005" style="width:86px"><button class="btn" id="stMe">Stream to this computer</button></div>
+        <p class="help">One 288-byte frame per control tick, 250 a second, with every servo's position, speed, current, voltage and temperature (docs/teleop_protocol.md).</p>
+      </div>
+    </div>
+
+    <div class="page" id="p-cal" hidden>
+      <div class="card"><h3><span>Calibration</span><span class="chip" id="calState">idle</span></h3>
+        <div class="small" id="calText">Idle.</div>
+        <div class="bar" id="calBar" hidden><i></i></div>
+        <div class="row" id="calAbortRow" hidden style="margin-top:9px"><button class="btn sm" id="calAbort">Abort</button></div>
+        <details class="step" id="st1"><summary><span class="n">1</span>Zero at the stops<span class="st"></span></summary><div class="body">
+          <p>The arm stays limp. One joint at a time: turn it gently against its mechanical stop, press <b>Capture</b> and hold it still for a moment. That sets the joint's zero. Once saved, this never has to be repeated: the servos remember their position through power-offs.</p>
+          <div class="stopnow" id="stopNow">-</div>
+          <div class="row"><button class="btn primary" id="stopCap">Capture</button><button class="btn" id="stopSkip">Next joint</button></div>
+          <div class="jgrid" id="stopGrid" style="margin-top:9px"></div>
+          <p style="margin-top:10px">When every joint has a ✓: put the arm in the standby pose. Every joint should read about 0° (Joints panel) and the 3D arm should copy the real one. Then save (step 4).</p>
+          <details class="small"><summary>Without stops: zero in the standby pose</summary>
+            <p style="margin-top:8px">Hold the arm in the CAD zero pose: upper arm vertical, every joint as in the view's <b>Standby</b> pose. Hold it still, then capture.</p>
+            <button class="btn" id="cZero">Capture zero</button></details></div></details>
+        <details class="step" id="st2"><summary><span class="n">2</span>Joint directions<span class="st"></span></summary><div class="body">
+          <p>Nothing to do: the directions are the same on every RAFT and fixed in the firmware (<b>arm_design.h</b>). J1 and the trigger turn the other way round from the others. If a joint in the 3D view turns against the real one, that servo is mounted differently from the design.</p></div></details>
+        <details class="step" id="st3"><summary><span class="n">3</span>Spring<span class="st"></span></summary><div class="body">
+          <div class="row"><select id="spSel" class="grow"></select></div>
+          <div class="row"><label>k <input type="number" id="spK" step="1" style="width:76px"> N/m</label><label>a <input type="number" id="spA" style="width:56px"> mm</label><label>b <input type="number" id="spB" style="width:56px"> mm</label></div>
+          <div class="row"><button class="btn primary" id="spApply">Apply</button><span class="small muted" id="spNow"></span></div></div></details>
+        <details class="step" id="st4"><summary><span class="n">4</span>Save<span class="st"></span></summary><div class="body">
+          <p>Zero and directions are enough for torque. Save now, so a later mistake costs nothing.</p>
+          <button class="btn primary save">Save to flash</button></div></details>
+        <details class="step" id="st5"><summary><span class="n">5</span>First torque<span class="st"></span></summary><div class="body">
+          <p>Hold the arm in the zero pose, switch on Hold and let go slowly. It should stay put. If a joint pushes away or falls, press <b>LIMP</b> and capture that joint's stop again (step 1).</p>
+          <button class="btn primary" id="cHold">Switch on Hold</button></div></details>
+        <details class="step" id="st6"><summary><span class="n">6</span>Spring strength<span class="st"></span></summary><div class="body">
+          <p>Tilt the upper arm 45° with the forearm level, then measure how much the spring really gives.</p>
+          <div class="row"><button class="btn" id="cPose45">Move to 45° / 45°</button><button class="btn primary" id="cSpring">Measure spring</button></div>
+          <p class="small" id="spScale" style="margin-top:10px"></p></div></details>
+        <details class="step" id="st7"><summary><span class="n">7</span>Save and test<span class="st"></span></summary><div class="body">
+          <p>Save, switch to gravity mode and let go at a few poses. If joints sink or creep up, trim the friction compensation (holding) on Drive.</p>
+          <div class="row"><button class="btn primary save">Save to flash</button><button class="btn" id="cGrav">Gravity mode</button></div></div></details>
+      </div>
+    </div>
+
+    <div class="page" id="p-servos" hidden>
+      <div class="card"><h3><span>Servo position test</span><span class="chip" id="stState">off</span></h3>
+        <p class="hint" style="margin-top:0">One servo in its own position mode; the other joints stay limp, so support the arm.</p>
+        <div class="row small" style="margin-top:10px">
+          <label>Joint <select id="stJ"><option value="1">J1</option><option value="2">J2</option><option value="3">J3</option><option value="4">J4</option><option value="5">J5</option><option value="6">J6</option><option value="7">J7 trigger</option></select></label>
+          <label>Limit <input type="number" id="stTq" min="50" max="1300" step="50" value="650" style="width:70px"> mA</label>
+          <label>Speed <input type="number" id="stSp" min="1" max="300" step="5" value="30" style="width:60px"> °/s</label>
+        </div>
+        <div class="row"><button class="btn primary" id="stStart">Start</button><button class="btn" id="stStop">Stop</button></div>
+        <div class="row" style="margin-top:10px"><input type="range" id="stJog" min="-90" max="90" step="0.5" value="0" class="grow" disabled><span class="num" id="stJogV" style="width:60px;text-align:right">0.0°</span></div>
+        <dl class="kv" id="stVals"></dl>
+        <p class="help">The slider moves the servo's target relative to where it started. Esc or LIMP stops it.</p>
+      </div>
+      <div class="card"><h3><span>Servo settings</span><button class="btn sm" id="svRead">Read</button></h3>
+        <div class="small muted" id="svHint">Reads each servo's identity, supply, temperature and settings from its register table. Takes about 10 ms; use it first on a new arm.</div>
+        <div class="tblwrap"><table class="tbl num" id="svTable" hidden></table></div>
+        <ul class="notes" id="svNotes" hidden></ul>
+        <pre class="raw mono" id="svRaw" hidden></pre>
+      </div>
+      <div class="card"><h3><span>Torque constants</span></h3><div id="advJ"></div>
+        <p class="help">Kt per joint in Nm/A, from the datasheet (0.441). Only while limp. The direction of each joint is fixed in the firmware.</p></div>
+    </div>
+
+    <div class="page" id="p-set" hidden>
+      <div class="card"><h3><span>Storage</span><span class="chip warn" id="unsaved" hidden>unsaved changes</span></h3>
+        <div class="row"><button class="btn primary save">Save</button><button class="btn" id="sLoad">Reload saved</button><button class="btn" id="sDefaults">Factory defaults</button></div>
+        <p class="help">Save is refused while teleoperation, a calibration, a move or a replay runs (writing flash pauses the control loop).</p></div>
+      <div class="card"><h3><span>This arm</span></h3>
+        <div class="row"><span class="lk">Name</span><input type="text" id="armName" maxlength="20" placeholder="e.g. left" class="grow" autocomplete="off" spellcheck="false"><button class="btn sm" id="nameSet">Set</button></div>
+        <dl class="kv"><dt>Network name</dt><dd id="armHost" class="num">-</dd></dl>
+        <p class="help">To tell several arms on one network apart. The name shows in the header and the browser tab at once; the arm answers at raft-<i>name</i>.local after Save and a restart. Up to 20 letters, digits and '-'; empty is raft-leader. Factory defaults keep the name.</p>
+      </div>
+      <div class="card"><h3><span>Teleoperation and haptics</span></h3>
+        <div class="row"><label class="small"><input type="checkbox" id="hsRe"> After a lost link, reclaim by itself (else wait for Resume)</label></div>
+        <div class="row"><label class="small" id="hsEnL"><input type="checkbox" id="hsEn"> PAR6 moves only while the enable button is held</label></div>
+        <div class="row"><label class="small"><input type="checkbox" id="hsPc"> Passivity damper on the coupling</label></div>
+        <div class="row"><label class="small"><input type="checkbox" id="hsBar"> Joint-limit barriers outside teleop too</label></div>
+        <div class="row"><span class="lk" style="width:110px">Contact force</span><input type="number" id="hsFg" min="0" max="0.2" step="0.005" style="width:76px" title="Nm per PAR6 Nm"><select id="hsFs" title="sign"><option value="-1">-1</option><option value="1">+1</option></select><input type="number" id="hsFd" min="0" max="5" step="0.05" style="width:64px" title="deadband, Nm"></div>
+        <div class="row"><span class="lk" style="width:110px">Friction (moving)</span><input type="number" id="hsFr" min="0" max="1" step="0.05" style="width:76px"><span class="small muted">× measured friction</span></div>
+        <div class="row"><span class="lk" style="width:110px">Trigger</span><input type="number" id="hsTo" step="1" style="width:64px"><input type="number" id="hsTc" step="1" style="width:64px"><span class="small muted">deg open / closed</span></div>
+        <div class="row"><span class="lk" style="width:110px">Gripper</span><input type="number" id="hsGo" min="0" max="255" step="1" style="width:64px"><input type="number" id="hsGc" min="0" max="255" step="1" style="width:64px"><span class="small muted">raw open / closed</span></div>
+        <div class="row"><button class="btn primary" id="hsSet">Apply</button><span class="small muted" id="hsFric"></span></div>
+        <p class="help">Contact force: Nm on the leader per Nm PAR6 feels, its sign and a deadband. It starts at 0 (off): check its sign on the real PAR6 first. Friction (moving) helps while you move a joint (0 = off; needs the torque calibration); start at 0.5: in raft_sim the guiding effort drops about 30 % and a released arm coasts 3.9° instead of 2.5°. Save stores these.</p>
+      </div>
+      <div class="card"><h3><span>Behaviour</span></h3>
+        <div class="row"><label><input type="checkbox" id="arOn"> Auto-rest after</label><input type="number" id="arIdle" min="3" step="1" style="width:70px"><span class="small muted">s left alone</span><button class="btn sm" id="arSet">Set</button></div>
+        <div class="row"><span class="small muted">Current register</span><input type="number" id="maUnit" step="0.1" style="width:76px"><span class="small muted">mA per unit</span><button class="btn sm" id="maSet">Set</button></div>
+      </div>
+      <div class="card"><h3><span>Display</span></h3>
+        <div class="row"><span class="lk">Theme</span><div class="seg grow" id="theme"><button data-t="auto">Auto</button><button data-t="light">Light</button><button data-t="dark">Dark</button></div></div>
+        <div class="row"><span class="lk">Live rate</span><select id="rate"><option>5</option><option>10</option><option>20</option><option>30</option><option>50</option></select><span class="small muted">frames/s</span></div>
+        <div class="row"><label class="small"><input type="checkbox" id="helpAll"> Show the explanations on every card</label></div>
+        <p class="help">The live rate is what the 3D view and the Joints panel get. Plots and Health take 5 a second, a hidden tab none. Lower saves power on the arm and the phone.</p>
+      </div>
+    </div>
+  </aside>
+</div>
+<button class="sbar" id="sbar" title="Open Health">
+  <span class="sb" title="The control loop on the arm: how many times a second it reads all 7 servos, computes and sends them new commands"><i class="dot" id="sbDot"></i>Loop <b id="sbHz">-</b> Hz</span>
+  <span class="sb" title="How unevenly the control loop's ticks are spaced: RMS deviation from the 4 ms period">Jitter <b id="sbJit">-</b></span>
+  <span class="sb" title="Work per tick, mean of the last second (the longest in brackets)">Tick <b id="sbTick">-</b></span>
+  <span class="sb" title="Ticks that came late in the last second">Late <b id="sbLate">-</b></span>
+  <span class="sb" title="Processor load: core 0 runs the network and this page, core 1 the control loop">CPU <b id="sbCpu">-</b> %</span>
+  <span class="sb" title="Missed servo reads per second over the last 10 s">Bus <b id="sbBus">-</b></span>
+  <span class="sb" title="A ping from this page to the arm and back over the network. Not the control loop, which runs on its own core.">Round trip <b id="sbRtt">-</b> ms</span>
+  <span class="sb" title="Free memory on the arm">Heap <b id="sbHeap">-</b> kB</span>
+  <span class="sb grow"></span>
+  <span class="sb" id="sbNet">-</span>
+</button>
+</div>
+<div class="modal" id="pal" hidden><div class="pal" role="dialog" aria-modal="true" aria-label="Search settings and commands">
+  <input type="text" id="palIn" placeholder="Search settings, pages and commands, or type a command" autocomplete="off" spellcheck="false">
+  <ul id="palList"></ul>
+  <div class="foot"><span><kbd>↑</kbd> <kbd>↓</kbd> choose</span><span><kbd>Enter</kbd> run</span><span><kbd>Esc</kbd> close (LIMP stays one press away)</span></div>
+</div></div>
+<div class="modal" id="ask" hidden><div class="mbox" role="dialog" aria-modal="true"><p id="askT"></p>
+  <div class="foot"><button class="btn" id="askNo">Cancel</button><button class="btn primary" id="askYes">Continue</button></div></div></div>
+<div id="toasts"></div>
+<script>
+(() => {
+'use strict';
+const $ = (s) => document.querySelector(s);
+const $$ = (s) => Array.from(document.querySelectorAll(s));
+const h = (tag, attrs, ...kids) => {
+  const e = document.createElement(tag);
+  for (const k in attrs || {}) {
+    const v = attrs[k];
+    if (k === 'class') e.className = v;
+    else if (k.startsWith('on')) e.addEventListener(k.slice(2), v);
+    else if (v !== false && v != null) e.setAttribute(k, v === true ? '' : v);
+  }
+  for (const c of kids.flat()) if (c != null) e.append(c.nodeType ? c : document.createTextNode(String(c)));
+  return e;
+};
+const D2R = Math.PI / 180, R2D = 180 / Math.PI;
+const NAMES = ['Base', 'Shoulder', 'Elbow', 'Wrist 1', 'Wrist 2', 'Wrist 3', 'Trigger'];
+const MODES = ['limp', 'gravity', 'move', 'bilateral'];
+const EVENTS = [['Move done', 'ok'], ['Move overridden by a hand', 'warn'], ['Auto-rest started', ''], ['Follower lost', 'warn'], ['Follower back', 'ok']];
+const RATED_MA = 350, STALL_MA = 1300;
+const store = {
+  get(k, d) { try { const v = localStorage.getItem('raft.' + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem('raft.' + k, JSON.stringify(v)); } catch (e) { /* private window */ } },
+};
+const DEMO = location.protocol === 'file:' || /[?&]demo\b/.test(location.search);
+const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
+const fix = (x, n) => (x == null || !isFinite(x)) ? '-' : x.toFixed(n);
+const focused = (el) => document.activeElement === el;
+const isTyping = (el) => el && (el.tagName === 'INPUT' || el.tagName === 'SELECT' || el.tagName === 'TEXTAREA') && el.type !== 'checkbox' && el.type !== 'range';
+
+// the model, used in demo mode; a real arm sends its own in the hello message (raft_model.h)
+const PI = Math.PI;
+const DEFAULT_HELLO = {
+  fw: 'demo (no arm connected)', sim: false, demo: true,
+  dh: [[0.05122, 0.013, -PI / 2, 0], [0, 0.1, PI, -PI / 2], [0, -0.02416, PI / 2, PI], [-0.09792, 0, -PI / 2, 0], [0, 0, PI / 2, 0], [-0.078277, 0, PI, PI]],
+  grip_r: [0, 0, -1, -1, 0, 0, 0, 1, 0], grip_p: [0, -0.01129, -0.042567],
+  lim_deg: [[-136, 136], [-105, 130], [-75, 150], [-158, 158], [-120, 120], [-149, 149], [0, 40]],
+  rest_deg: [0, 0, -70, 0, 0, 0, 0],
+  springs: [{ name: 'Z-075NI', shop: 'federnshop', k: 565, a_mm: 13, b_mm: 20 }, { name: 'Z-078AI', shop: 'federnshop', k: 718, a_mm: 13, b_mm: 20 },
+            { name: 'Z-078I', shop: 'federnshop', k: 824, a_mm: 13, b_mm: 20 }, { name: 'Z-077AI', shop: 'federnshop', k: 1027, a_mm: 13, b_mm: 20 }],
+  sys: { host: 'demo' },
+};
+
+const S = {
+  hello: null, st: null, f: null, fNew: false, hm: null, conn: 'connecting', rate: store.get('rate', 20), units: store.get('units', 'deg'),
+  fCount: 0, fps: 0, fpsT: performance.now(), rtt: null, target: null, showFol: store.get('showFol', true),
+  calSeq: null, calKind: '', hist: [], modelErr: null, grabMode: false, pull: null, hidden: false, rateSent: null, mode: null,
+};
+
+// ---------------------------------------------------------------- vectors and forward kinematics
+const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+const add = (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
+const mulS = (a, s) => [a[0] * s, a[1] * s, a[2] * s];
+const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+const norm = (a) => { const l = Math.hypot(a[0], a[1], a[2]) || 1; return [a[0] / l, a[1] / l, a[2] / l]; };
+function mul(a, b) {
+  const R = new Array(9), p = new Array(3);
+  for (let i = 0; i < 3; i++) {
+    for (let j = 0; j < 3; j++) R[3 * i + j] = a.R[3 * i] * b.R[j] + a.R[3 * i + 1] * b.R[3 + j] + a.R[3 * i + 2] * b.R[6 + j];
+    p[i] = a.R[3 * i] * b.p[0] + a.R[3 * i + 1] * b.p[1] + a.R[3 * i + 2] * b.p[2] + a.p[i];
+  }
+  return { R, p };
+}
+function dhA(th, d, a, al) {
+  const ct = Math.cos(th), st = Math.sin(th), ca = Math.cos(al), sa = Math.sin(al);
+  return { R: [ct, -st * ca, st * sa, st, ct * ca, -ct * sa, 0, sa, ca], p: [a * ct, a * st, d] };
+}
+// q in rad, CAD convention: frames 0..6 (6 = TCP) and 7 = trigger hinge, like kinematics.cpp
+function fk(q) {
+  const H = S.hello;
+  const T = [{ R: [1, 0, 0, 0, 1, 0, 0, 0, 1], p: [0, 0, 0] }];
+  for (let i = 0; i < 6; i++) { const L = H.dh[i]; T.push(mul(T[i], dhA((q[i] || 0) + L[3], L[0], L[1], L[2]))); }
+  const c = Math.cos(q[6] || 0), s = Math.sin(q[6] || 0);
+  T.push(mul(T[6], mul({ R: H.grip_r, p: H.grip_p }, { R: [c, -s, 0, s, c, 0, 0, 0, 1], p: [0, 0, 0] })));
+  return T;
+}
+const LINK_R = [0.021, 0.0125, 0.0115, 0.0105, 0.0095, 0.0085];
+function skeleton(q) {
+  const T = fk(q), segs = [], joints = [];
+  for (let i = 0; i < 6; i++) {
+    const d = S.hello.dh[i][0], a = S.hello.dh[i][1];
+    const p0 = T[i].p, z = [T[i].R[2], T[i].R[5], T[i].R[8]];
+    const p1 = add(p0, mulS(z, d)), p2 = T[i + 1].p;
+    if (Math.abs(d) > 1e-4) segs.push([p0, p1, LINK_R[i]]);
+    if (Math.abs(a) > 1e-4) segs.push([p1, p2, LINK_R[i] * 0.95]);
+  }
+  segs.push([T[6].p, T[7].p, 0.0065]);
+  const x7 = [T[7].R[0], T[7].R[3], T[7].R[6]];
+  segs.push([T[7].p, add(T[7].p, mulS(x7, 0.024)), 0.0042]);
+  for (let i = 1; i <= 5; i++) joints.push({ p: T[i].p, r: 0.0125, j: i });
+  joints.push({ p: T[7].p, r: 0.0065, j: 6 });
+  return { T, segs, joints };
+}
+
+// ---------------------------------------------------------------- 3D view (canvas 2D, drawn only when something changed)
+const cv = $('#cv'), ctx = cv.getContext('2d');
+let W = 1, H = 1, DPR = 1, dirty = true, C = {}, F = 1, B = null;
+const VIEWS = { iso: [1.05, 0.38, 0.62], side: [PI / 2, 0.05, 0.62], front: [0, 0.05, 0.62], top: [PI / 2, 1.5, 0.75] };
+const cam = { yaw: store.get('camYaw', VIEWS.iso[0]), pitch: store.get('camPitch', VIEWS.iso[1]), dist: store.get('camDist', VIEWS.iso[2]), tgt: [0.08, 0, 0.1] };
+// a CSS colour (#rgb, #rrggbb, rgb(), rgba()) as [r, g, b, a] in 0..1, for WebGL
+function rgba(s) {
+  s = (s || '').trim();
+  let m;
+  if ((m = /^#([0-9a-f]{3})$/i.exec(s))) return [...m[1]].map((c) => parseInt(c + c, 16) / 255).concat([1]);
+  if ((m = /^#([0-9a-f]{6})$/i.exec(s))) return [0, 2, 4].map((i) => parseInt(m[1].substr(i, 2), 16) / 255).concat([1]);
+  if ((m = /rgba?\(([^)]+)\)/i.exec(s))) { const p = m[1].split(',').map(parseFloat); return [p[0] / 255, p[1] / 255, p[2] / 255, p.length > 3 ? p[3] : 1]; }
+  return [0.5, 0.5, 0.5, 1];
+}
+const C4 = {};
+let SERIES = [];
+function readColors() {
+  const cs = getComputedStyle(document.documentElement);
+  for (const k of ['arm', 'armd', 'armh', 'grid', 'grid2', 'shadow', 'nav', 'warn', 'muted', 'faint', 'ok', 'badfill', 'text', 'mesh', 'meshb', 'meshacc', 'ghostF', 'ghostT',
+                   'ax0', 'ax1', 'ax2', 'panel2', 'line', 's0', 's1', 's2', 's3', 's4', 's5', 's6']) {
+    C[k] = cs.getPropertyValue('--' + k).trim();
+    C4[k] = rgba(C[k]);
+  }
+  SERIES = [C.s0, C.s1, C.s2, C.s3, C.s4, C.s5, C.s6];
+  dirty = true;
+  if (typeof drawLegend === 'function') { drawLegend(); drawChart(); drawScope(); drawHealthChart(); }
+}
+function resize() {
+  const r = cv.getBoundingClientRect();
+  DPR = Math.min(window.devicePixelRatio || 1, 2);
+  W = Math.max(1, r.width); H = Math.max(1, r.height);
+  cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
+  dirty = true;
+}
+function basis() {
+  const cp = Math.cos(cam.pitch), sp = Math.sin(cam.pitch), cy = Math.cos(cam.yaw), sy = Math.sin(cam.yaw);
+  const eye = [cam.tgt[0] + cam.dist * cp * cy, cam.tgt[1] + cam.dist * cp * sy, cam.tgt[2] + cam.dist * sp];
+  const fwd = norm(sub(cam.tgt, eye));
+  let right = cross(fwd, [0, 0, 1]);
+  if (Math.hypot(right[0], right[1], right[2]) < 1e-6) right = [-sy, cy, 0];
+  right = norm(right);
+  return { eye, fwd, right, up: cross(right, fwd) };
+}
+function P(p) {
+  const d = sub(p, B.eye), z = dot(d, B.fwd);
+  if (z < 0.02) return null;
+  return [W / 2 + F * dot(d, B.right) / z, H / 2 - F * dot(d, B.up) / z, z];
+}
+function seg2(a, b, col, w, alpha) {
+  ctx.globalAlpha = alpha == null ? 1 : alpha;
+  ctx.strokeStyle = col; ctx.lineWidth = w;
+  ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke();
+  ctx.globalAlpha = 1;
+}
+function line3(a, b, col, w) { const pa = P(a), pb = P(b); if (pa && pb) seg2(pa, pb, col, w || 1); }
+const wOf = (r, a, b) => Math.max(2, 2 * r * F / ((a[2] + b[2]) / 2));
+function tempColor(t) { return t >= 65 ? C.badfill : t >= 55 ? C.warn : C.nav; }
+function drawArm(sk, temps) {
+  const items = [];
+  for (const s of sk.segs) { const a = P(s[0]), b = P(s[1]); if (a && b) items.push({ a, b, r: s[2], z: (a[2] + b[2]) / 2 }); }
+  for (const j of sk.joints) { const p = P(j.p); if (p) items.push({ p, r: j.r, z: p[2] - 0.004, j: j.j }); }
+  items.sort((u, v) => v.z - u.z);
+  ctx.lineCap = 'round';
+  for (const it of items) {
+    if (it.p) {
+      const rr = Math.max(3, it.r * F / it.p[2]);
+      ctx.beginPath(); ctx.arc(it.p[0], it.p[1], rr, 0, 2 * PI);
+      ctx.fillStyle = C.armd; ctx.fill();
+      ctx.lineWidth = Math.max(1.5, rr * 0.28);
+      ctx.strokeStyle = temps ? tempColor(temps[it.j]) : C.nav; ctx.stroke();
+      continue;
+    }
+    const w = wOf(it.r, it.a, it.b);
+    seg2(it.a, it.b, C.armd, w);
+    seg2(it.a, it.b, C.arm, w * 0.74);
+    const dx = it.b[0] - it.a[0], dy = it.b[1] - it.a[1], L = Math.hypot(dx, dy) || 1;
+    let nx = -dy / L, ny = dx / L;
+    if (ny > 0) { nx = -nx; ny = -ny; }
+    const o = w * 0.17;
+    seg2([it.a[0] + nx * o, it.a[1] + ny * o], [it.b[0] + nx * o, it.b[1] + ny * o], C.armh, Math.max(1, w * 0.18), 0.5);
+  }
+}
+function drawGhost(sk, col, alpha, dashed) {
+  ctx.lineCap = 'round';
+  ctx.setLineDash(dashed ? [7, 6] : []);
+  for (const s of sk.segs) { const a = P(s[0]), b = P(s[1]); if (a && b) seg2(a, b, col, wOf(s[2], a, b) * 0.62, alpha); }
+  ctx.setLineDash([]);
+}
+function drawShadow(sk) {
+  ctx.lineCap = 'round';
+  for (const s of sk.segs) {
+    const a = P([s[0][0], s[0][1], 0]), b = P([s[1][0], s[1][1], 0]);
+    if (a && b) seg2(a, b, C.shadow, wOf(s[2], a, b));
+  }
+}
+function drawGrid() {
+  for (let k = -6; k <= 7; k++) line3([k * 0.05, -0.3, 0], [k * 0.05, 0.3, 0], k === 0 ? C.grid2 : C.grid);
+  for (let k = -6; k <= 6; k++) line3([-0.3, k * 0.05, 0], [0.35, k * 0.05, 0], k === 0 ? C.grid2 : C.grid);
+  ctx.beginPath();
+  let first = true;
+  for (let k = 0; k <= 48; k++) {
+    const a = k / 48 * 2 * PI, p = P([0.045 * Math.cos(a), 0.045 * Math.sin(a), 0]);
+    if (!p) continue;
+    if (first) { ctx.moveTo(p[0], p[1]); first = false; } else ctx.lineTo(p[0], p[1]);
+  }
+  ctx.fillStyle = C.grid; ctx.fill();
+  ctx.strokeStyle = C.grid2; ctx.lineWidth = 1; ctx.stroke();
+  const o = P([0, 0, 0]), x = P([0.06, 0, 0]);
+  if (o && x) { seg2(o, x, C.ax0, 1.5, 0.6); }
+}
+function drawTriad(T) {
+  const cols = [C.ax0, C.ax1, C.ax2];
+  for (let k = 0; k < 3; k++) line3(T.p, add(T.p, mulS([T.R[k], T.R[3 + k], T.R[6 + k]], 0.03)), cols[k], 2.2);
+}
+function message(t) {
+  ctx.fillStyle = C.muted; ctx.font = '600 13px system-ui,sans-serif'; ctx.textAlign = 'center';
+  ctx.fillText(t, W / 2, H - 26);
+  ctx.textAlign = 'left';
+}
+// ---------------------------------------------------------------- WebGL: the real arm, from the CAD meshes in arm.bin
+// tools/build_arm_mesh.py bakes every link's mesh into the DH frame it rides on, so drawing a pose only needs
+// the same forward kinematics as above. Lit, with a planar shadow and see-through ghosts. If WebGL or the
+// meshes are missing, the stick figure above stays.
+const glc = $('#gl');
+const G = { gl: null, prog: null, u: {}, a: {}, parts: [], ready: false, tris: 0, grid: null, nGrid: 0, axes: null, failed: '' };
+const VS = 'attribute vec3 aPos; attribute vec3 aNrm; uniform mat4 uVP; uniform mat4 uM; varying vec3 vN; varying vec3 vW;\n' +
+  'void main() { vec4 w = uM * vec4(aPos, 1.0); vW = w.xyz; vN = mat3(uM) * aNrm; gl_Position = uVP * w; }';
+const FS = 'precision mediump float; uniform vec4 uColor; uniform int uLit; uniform vec3 uEye; uniform vec3 uKey; varying vec3 vN; varying vec3 vW;\n' +
+  'void main() {\n' +
+  '  if (uLit == 0) { gl_FragColor = uColor; return; }\n' +
+  '  vec3 n = normalize(vN); vec3 v = normalize(uEye - vW);\n' +
+  '  if (dot(n, v) < 0.0) n = -n;\n' +
+  '  float key = max(dot(n, uKey), 0.0), fill = max(dot(n, normalize(vec3(-0.4, -0.5, 0.6))), 0.0), hemi = 0.5 + 0.5 * n.z;\n' +
+  '  float spec = pow(max(dot(n, normalize(uKey + v)), 0.0), 40.0) * 0.30, rim = pow(1.0 - max(dot(n, v), 0.0), 3.0) * 0.16;\n' +
+  '  gl_FragColor = vec4(uColor.rgb * (0.26 + 0.20 * hemi + 0.62 * key + 0.16 * fill) + vec3(spec + rim), uColor.a);\n' +
+  '}';
+const I4 = new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
+const SHADOW = new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0.22, -0.12, 0, 0, 0, 0, 0.0008, 1]);   // onto z = 0, light slightly off vertical
+function glInit() {
+  let gl = null;
+  try { gl = glc.getContext('webgl', { antialias: true, stencil: true, alpha: true, premultipliedAlpha: false }); } catch (e) { gl = null; }
+  if (!gl) { G.failed = 'WebGL is not available'; return false; }
+  const shader = (type, src) => {
+    const s = gl.createShader(type);
+    gl.shaderSource(s, src); gl.compileShader(s);
+    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s));
+    return s;
+  };
+  try {
+    const p = gl.createProgram();
+    gl.attachShader(p, shader(gl.VERTEX_SHADER, VS)); gl.attachShader(p, shader(gl.FRAGMENT_SHADER, FS));
+    gl.linkProgram(p);
+    if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
+    G.prog = p;
+  } catch (e) { G.failed = 'shader: ' + e.message; return false; }
+  G.gl = gl;
+  for (const n of ['uVP', 'uM', 'uColor', 'uLit', 'uEye', 'uKey']) G.u[n] = gl.getUniformLocation(G.prog, n);
+  G.a.pos = gl.getAttribLocation(G.prog, 'aPos');
+  G.a.nrm = gl.getAttribLocation(G.prog, 'aNrm');
+  const grid = [];
+  for (let k = -6; k <= 7; k++) if (k) grid.push(k * 0.05, -0.3, 0, k * 0.05, 0.3, 0);
+  for (let k = -6; k <= 6; k++) if (k) grid.push(-0.3, k * 0.05, 0, 0.35, k * 0.05, 0);
+  G.grid = glBuf(new Float32Array(grid)); G.nGrid = grid.length / 3;
+  G.axes = glBuf(new Float32Array([-0.3, 0, 0, 0.35, 0, 0, 0, -0.3, 0, 0, 0.3, 0]));
+  return true;
+}
+function glBuf(data) { const gl = G.gl, b = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, b); gl.bufferData(gl.ARRAY_BUFFER, data, gl.STATIC_DRAW); return b; }
+function parseMesh(buf) {
+  const v = new DataView(buf);
+  if (buf.byteLength < 12 || String.fromCharCode.apply(null, new Uint8Array(buf, 0, 8)) !== 'RAFTMESH' || v.getUint16(8, true) !== 2)
+    throw new Error('not a RAFT mesh file (version 2)');
+  const unzig = (u) => (u >>> 1) ^ -(u & 1);         // zig-zag decode
+  const parts = [];
+  let o = 12;
+  for (let i = 0, n = v.getUint16(10, true); i < n; i++) {
+    const frame = v.getUint8(o), mat = v.getUint8(o + 1), nv = v.getUint16(o + 2, true), nt = v.getUint16(o + 4, true);
+    o += 6;
+    const lo = [0, 1, 2].map((k) => v.getFloat32(o + 4 * k, true)), st = [0, 1, 2].map((k) => v.getFloat32(o + 12 + 4 * k, true));
+    o += 24;
+    const pos = new Float32Array(nv * 3), idx = new Uint16Array(nt * 3), q = [0, 0, 0];
+    for (let j = 0; j < nv * 3; j++, o += 2) { const k = j % 3; q[k] = (q[k] + unzig(v.getUint16(o, true))) & 0xffff; pos[j] = lo[k] + q[k] * st[k]; }
+    let last = 0;
+    for (let j = 0; j < nt * 3; j++, o += 2) { last = (last + unzig(v.getUint16(o, true))) & 0xffff; idx[j] = last; }
+    parts.push({ frame, mat, pos, idx });
+  }
+  return parts;
+}
+// unshared triangles with normals averaged over neighbours less than 40 deg apart: smooth curves, crisp edges
+function expandPart(pos, idx) {
+  const nt = idx.length / 3, nv = pos.length / 3, fa = new Float32Array(nt * 3), fu = new Float32Array(nt * 3);
+  for (let t = 0; t < nt; t++) {
+    const a = 3 * idx[3 * t], b = 3 * idx[3 * t + 1], c = 3 * idx[3 * t + 2];
+    const ux = pos[b] - pos[a], uy = pos[b + 1] - pos[a + 1], uz = pos[b + 2] - pos[a + 2];
+    const vx = pos[c] - pos[a], vy = pos[c + 1] - pos[a + 1], vz = pos[c + 2] - pos[a + 2];
+    const nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx, l = Math.hypot(nx, ny, nz) || 1e-12;
+    fa[3 * t] = nx; fa[3 * t + 1] = ny; fa[3 * t + 2] = nz;
+    fu[3 * t] = nx / l; fu[3 * t + 1] = ny / l; fu[3 * t + 2] = nz / l;
+  }
+  const start = new Uint32Array(nv + 1);
+  for (let j = 0; j < idx.length; j++) start[idx[j] + 1]++;
+  for (let j = 0; j < nv; j++) start[j + 1] += start[j];
+  const inc = new Uint32Array(idx.length), fillAt = start.slice(0, nv);
+  for (let j = 0; j < idx.length; j++) inc[fillAt[idx[j]]++] = (j / 3) | 0;
+  const Pn = new Float32Array(nt * 9), Nn = new Float32Array(nt * 9), cosMax = Math.cos(40 * D2R);
+  for (let t = 0; t < nt; t++) for (let k = 0; k < 3; k++) {
+    const vi = idx[3 * t + k], o = 9 * t + 3 * k;
+    Pn[o] = pos[3 * vi]; Pn[o + 1] = pos[3 * vi + 1]; Pn[o + 2] = pos[3 * vi + 2];
+    let nx = 0, ny = 0, nz = 0;
+    for (let s = start[vi]; s < start[vi + 1]; s++) {
+      const f = inc[s];
+      if (fu[3 * f] * fu[3 * t] + fu[3 * f + 1] * fu[3 * t + 1] + fu[3 * f + 2] * fu[3 * t + 2] >= cosMax) { nx += fa[3 * f]; ny += fa[3 * f + 1]; nz += fa[3 * f + 2]; }
+    }
+    const l = Math.hypot(nx, ny, nz) || 1;
+    Nn[o] = nx / l; Nn[o + 1] = ny / l; Nn[o + 2] = nz / l;
+  }
+  return { P: Pn, N: Nn, n: nt * 3 };
+}
+function loadMeshes() {
+  if (!G.gl) return;
+  // a copy of the page may carry the model inline (base64 in window.RAFT_ARM_B64); the arm serves /arm.bin
+  const inline = typeof window.RAFT_ARM_B64 === 'string' ? window.RAFT_ARM_B64 : null;
+  const get = inline ? Promise.resolve(Uint8Array.from(atob(inline), (c) => c.charCodeAt(0)).buffer)
+    : fetch('arm.bin').then((r) => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.arrayBuffer(); });
+  get
+    .then((buf) => {
+      G.parts = parseMesh(buf).map((p) => { const e = expandPart(p.pos, p.idx); return { frame: p.frame, mat: p.mat, vbo: glBuf(e.P), nbo: glBuf(e.N), n: e.n }; });
+      G.tris = G.parts.reduce((s, p) => s + p.n / 3, 0);
+      G.ready = true; dirty = true;
+      logLine('okk', 'arm model loaded: ' + G.tris + ' triangles');
+    })
+    .catch((e) => { G.failed = 'arm model: ' + e.message; logLine('bad', 'arm model not loaded (' + e.message + '), showing the simple arm'); });
+}
+glc.addEventListener('webglcontextlost', (e) => { e.preventDefault(); G.ready = false; dirty = true; });
+glc.addEventListener('webglcontextrestored', () => { if (glInit()) loadMeshes(); });
+const mat4 = (T) => new Float32Array([T.R[0], T.R[3], T.R[6], 0, T.R[1], T.R[4], T.R[7], 0, T.R[2], T.R[5], T.R[8], 0, T.p[0], T.p[1], T.p[2], 1]);
+function mulM(a, b) {                       // column-major 4x4: a * b
+  const r = new Float32Array(16);
+  for (let c = 0; c < 4; c++) for (let rr = 0; rr < 4; rr++)
+    r[4 * c + rr] = a[rr] * b[4 * c] + a[4 + rr] * b[4 * c + 1] + a[8 + rr] * b[4 * c + 2] + a[12 + rr] * b[4 * c + 3];
+  return r;
+}
+// the same camera as P(): screen = centre + F * (right, up) / depth, as a clip-space matrix
+function viewProj() {
+  const n = 0.02, f = 6, A = (f + n) / (f - n), Bc = -2 * f * n / (f - n), sx = 2 * F / W, sy = 2 * F / H;
+  const r = B.right, u = B.up, w = B.fwd, e = B.eye;
+  const row0 = [r[0] * sx, r[1] * sx, r[2] * sx, -dot(r, e) * sx], row1 = [u[0] * sy, u[1] * sy, u[2] * sy, -dot(u, e) * sy];
+  const row3 = [w[0], w[1], w[2], -dot(w, e)], row2 = [A * w[0], A * w[1], A * w[2], -A * dot(w, e) + Bc];
+  const m = new Float32Array(16);
+  for (let c = 0; c < 4; c++) { m[4 * c] = row0[c]; m[4 * c + 1] = row1[c]; m[4 * c + 2] = row2[c]; m[4 * c + 3] = row3[c]; }
+  return m;
+}
+function glDrawPart(p) {
+  const gl = G.gl;
+  gl.bindBuffer(gl.ARRAY_BUFFER, p.vbo); gl.enableVertexAttribArray(G.a.pos); gl.vertexAttribPointer(G.a.pos, 3, gl.FLOAT, false, 0, 0);
+  gl.bindBuffer(gl.ARRAY_BUFFER, p.nbo); gl.enableVertexAttribArray(G.a.nrm); gl.vertexAttribPointer(G.a.nrm, 3, gl.FLOAT, false, 0, 0);
+  gl.drawArrays(gl.TRIANGLES, 0, p.n);
+}
+function glLines(b, n, col) {
+  const gl = G.gl;
+  gl.bindBuffer(gl.ARRAY_BUFFER, b); gl.enableVertexAttribArray(G.a.pos); gl.vertexAttribPointer(G.a.pos, 3, gl.FLOAT, false, 0, 0);
+  gl.disableVertexAttribArray(G.a.nrm); gl.vertexAttrib3f(G.a.nrm, 0, 0, 1);
+  gl.uniform4fv(G.u.uColor, col);
+  gl.drawArrays(gl.LINES, 0, n);
+}
+function glSize() {
+  if (glc.width !== cv.width || glc.height !== cv.height) { glc.width = cv.width; glc.height = cv.height; }
+}
+function glClear() {
+  if (!G.gl) return;
+  glSize();
+  G.gl.clearColor(0, 0, 0, 0); G.gl.clear(G.gl.COLOR_BUFFER_BIT);
+}
+// ghosts: [{q: rad[7], color: [r,g,b,a]}]
+function glRender(q, ghosts) {
+  const gl = G.gl;
+  glSize();
+  gl.viewport(0, 0, glc.width, glc.height);
+  gl.clearColor(0, 0, 0, 0); gl.clearDepth(1); gl.clearStencil(0);
+  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT | gl.STENCIL_BUFFER_BIT);
+  gl.useProgram(G.prog);
+  gl.uniformMatrix4fv(G.u.uVP, false, viewProj());
+  gl.uniform3fv(G.u.uEye, B.eye);
+  gl.uniform3fv(G.u.uKey, norm(add(add(mulS(B.up, 0.8), mulS(B.right, -0.4)), mulS(B.fwd, -0.5))));
+  gl.enable(gl.BLEND);
+  gl.blendFuncSeparate(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA, gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+  gl.disable(gl.DEPTH_TEST); gl.depthMask(false); gl.disable(gl.CULL_FACE);
+  gl.uniform1i(G.u.uLit, 0);
+  gl.uniformMatrix4fv(G.u.uM, false, I4);
+  glLines(G.grid, G.nGrid, C4.grid);
+  glLines(G.axes, 4, C4.grid2);
+  const T = fk(q);
+  // planar shadow, each pixel darkened once (stencil)
+  gl.enable(gl.STENCIL_TEST); gl.stencilFunc(gl.EQUAL, 0, 0xff); gl.stencilOp(gl.KEEP, gl.KEEP, gl.INCR);
+  gl.uniform4fv(G.u.uColor, C4.shadow);
+  for (const p of G.parts) { gl.uniformMatrix4fv(G.u.uM, false, mulM(SHADOW, mat4(T[p.frame]))); glDrawPart(p); }
+  gl.disable(gl.STENCIL_TEST);
+  // the arm
+  gl.disable(gl.BLEND); gl.enable(gl.DEPTH_TEST); gl.depthFunc(gl.LEQUAL); gl.depthMask(true);
+  gl.uniform1i(G.u.uLit, 1);
+  for (const p of G.parts) {
+    gl.uniformMatrix4fv(G.u.uM, false, mat4(T[p.frame]));
+    gl.uniform4fv(G.u.uColor, p.mat === 0 ? C4.meshb : p.mat === 2 ? C4.meshacc : C4.mesh);
+    glDrawPart(p);
+  }
+  // see-through ghosts (move target, PAR6 follower), one even layer each: a depth-only pass finds the nearest
+  // surface, then only that surface is tinted, so no inner parts show through. The base never moves: skipped.
+  for (const gh of ghosts) {
+    const Tg = fk(gh.q);
+    const moving = G.parts.filter((p) => p.frame > 0);
+    gl.disable(gl.BLEND); gl.colorMask(false, false, false, false); gl.depthMask(true); gl.depthFunc(gl.LESS);
+    for (const p of moving) { gl.uniformMatrix4fv(G.u.uM, false, mat4(Tg[p.frame])); glDrawPart(p); }
+    gl.enable(gl.BLEND); gl.colorMask(true, true, true, true); gl.depthMask(false); gl.depthFunc(gl.EQUAL);
+    gl.uniform4fv(G.u.uColor, gh.color);
+    for (const p of moving) { gl.uniformMatrix4fv(G.u.uM, false, mat4(Tg[p.frame])); glDrawPart(p); }
+    gl.depthFunc(gl.LEQUAL);
+  }
+  gl.depthMask(true); gl.disable(gl.BLEND);
+}
+// with the real arm drawn, joints only get a marker when their servo runs warm
+function drawHotJoints(sk, temps) {
+  if (!temps) return;
+  ctx.font = '600 11px system-ui,sans-serif';
+  for (const j of sk.joints) {
+    const t = temps[j.j];
+    if (t < 55) continue;
+    const p = P(j.p);
+    if (!p) continue;
+    ctx.beginPath(); ctx.arc(p[0], p[1], 7, 0, 2 * PI); ctx.lineWidth = 2.5; ctx.strokeStyle = tempColor(t); ctx.stroke();
+    ctx.fillStyle = tempColor(t); ctx.fillText('J' + (j.j + 1) + ' ' + t + ' °C', p[0] + 11, p[1] + 4);
+  }
+}
+// the PAR6 follower from the live frame (fresh only while its flag is set), in RAFT's CAD convention
+const follower = () => S.f && S.f.qF && (S.f.flags & 256) ? S.f.qF : null;
+function draw() {
+  dirty = false;
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ctx.clearRect(0, 0, W, H);
+  if (W < 4 || H < 4) return;
+  if (!S.hello) { glClear(); message('Connecting to the arm...'); return; }
+  B = basis();
+  F = Math.min(W, H) / 2 / Math.tan(19 * D2R);
+  const q = S.f ? S.f.q : [0, 0, 0, 0, 0, 0, 0];
+  const sk = skeleton(q);
+  const fol = S.showFol ? follower() : null;
+  const tgt = S.target ? S.target.map((d) => d * D2R) : null;
+  if (G.ready) {
+    const ghosts = [];
+    if (fol) ghosts.push({ q: fol, color: [C4.ghostF[0], C4.ghostF[1], C4.ghostF[2], 0.42] });
+    if (tgt) ghosts.push({ q: tgt, color: [C4.ghostT[0], C4.ghostT[1], C4.ghostT[2], 0.5] });
+    glRender(q, ghosts);
+    drawHotJoints(sk, S.f ? S.f.temp : null);
+  } else {
+    glClear();
+    drawGrid();
+    drawShadow(sk);
+    if (fol) drawGhost(skeleton(fol), C.ghostF, 0.42, false);
+    if (tgt) drawGhost(skeleton(tgt), C.ghostT, 0.55, true);
+    drawArm(sk, S.f ? S.f.temp : null);
+  }
+  drawTriad(sk.T[6]);
+  if (S.pull) {
+    const a = P(sk.T[6].p), b = P(S.pull);
+    if (a && b) {
+      ctx.setLineDash([4, 4]); seg2(a, b, C.nav, 1.5); ctx.setLineDash([]);
+      ctx.beginPath(); ctx.arc(b[0], b[1], 5, 0, 2 * PI); ctx.fillStyle = C.nav; ctx.fill();
+    }
+  }
+  if (!S.f) message(S.conn === 'live' ? 'Waiting for the first frame...' : 'Not connected: showing the zero pose');
+  else if (S.st && S.st.calibrated === false) message('Not calibrated yet: these angles are uncorrected (Calibrate)');
+}
+function loop() { if (dirty) { draw(); S.draws = (S.draws || 0) + 1; } requestAnimationFrame(loop); }
+function saveCam() { store.set('camYaw', cam.yaw); store.set('camPitch', cam.pitch); store.set('camDist', cam.dist); }
+function setView(v) { const p = VIEWS[v]; cam.yaw = p[0]; cam.pitch = p[1]; cam.dist = p[2]; cam.tgt = [0.08, 0, 0.1]; saveCam(); dirty = true; }
+
+// pointer: drag rotates, right-drag or Ctrl-drag pans, wheel or pinch zooms; in the simulator Shift-drag pulls the arm
+const ptrs = new Map();
+let drag = null, pinch = null, lastPull = 0;
+cv.addEventListener('pointerdown', (e) => {
+  cv.setPointerCapture(e.pointerId);
+  ptrs.set(e.pointerId, [e.clientX, e.clientY]);
+  if (ptrs.size === 2) {
+    const [a, b] = Array.from(ptrs.values());
+    pinch = { d: Math.hypot(a[0] - b[0], a[1] - b[1]), dist: cam.dist }; drag = null; return;
+  }
+  const grab = S.hello && S.hello.sim && S.f && (e.shiftKey || S.grabMode);
+  let g = null;
+  if (grab) { const Bb = basis(), f = Math.min(W, H) / 2 / Math.tan(19 * D2R), p0 = S.f.tcp.slice(0, 3); g = { p0, z: dot(sub(p0, Bb.eye), Bb.fwd), B: Bb, f }; }
+  drag = { x: e.clientX, y: e.clientY, yaw: cam.yaw, pitch: cam.pitch, tgt: cam.tgt.slice(), pan: e.button === 2 || e.ctrlKey, g };
+});
+cv.addEventListener('pointermove', (e) => {
+  if (!ptrs.has(e.pointerId)) return;
+  ptrs.set(e.pointerId, [e.clientX, e.clientY]);
+  if (pinch && ptrs.size === 2) {
+    const [a, b] = Array.from(ptrs.values());
+    cam.dist = clamp(pinch.dist * pinch.d / Math.max(10, Math.hypot(a[0] - b[0], a[1] - b[1])), 0.2, 2.5); dirty = true; return;
+  }
+  if (!drag) return;
+  const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+  if (drag.g) {
+    const g = drag.g, s = g.z / g.f;
+    S.pull = add(g.p0, add(mulS(g.B.right, dx * s), mulS(g.B.up, -dy * s)));
+    const now = performance.now();
+    if (now - lastPull > 33) { lastPull = now; send({ cmd: 'sim_hand', mode: 'pull', p: S.pull.map((v) => +v.toFixed(4)) }).catch(() => {}); }
+  } else if (drag.pan) {
+    const Bb = basis(), s = cam.dist / (Math.min(W, H) / 2 / Math.tan(19 * D2R));
+    cam.tgt = add(drag.tgt, add(mulS(Bb.right, -dx * s), mulS(Bb.up, dy * s)));
+  } else {
+    cam.yaw = drag.yaw - dx * 0.008;
+    cam.pitch = clamp(drag.pitch + dy * 0.008, -0.15, 1.52);
+  }
+  dirty = true;
+});
+const endPtr = (e) => {
+  ptrs.delete(e.pointerId);
+  if (ptrs.size < 2) pinch = null;
+  if (drag && drag.g) { send({ cmd: 'sim_hand', mode: 'free' }).catch(() => {}); S.pull = null; }
+  if (drag) saveCam();
+  drag = null; dirty = true;
+};
+cv.addEventListener('pointerup', endPtr);
+cv.addEventListener('pointercancel', endPtr);
+cv.addEventListener('wheel', (e) => { e.preventDefault(); cam.dist = clamp(cam.dist * Math.exp(e.deltaY * 0.0012), 0.2, 2.5); saveCam(); dirty = true; }, { passive: false });
+cv.addEventListener('contextmenu', (e) => e.preventDefault());
+cv.addEventListener('dblclick', () => setView('iso'));
+for (const b of $$('[data-view]')) b.addEventListener('click', () => setView(b.dataset.view));
+
+// ---------------------------------------------------------------- connection
+// The page asks for what is on screen only (ws_rate): live frames at the chosen rate (5 a second on Plots and Health,
+// none in a hidden tab), the status when it changes, and the binary health message once a second (docs/web_ui.md).
+let ws = null, retryT = null, backoff = 500, nextId = 1;
+const pending = new Map();
+function setConn(c) {
+  S.conn = c;
+  $('#cDot').className = 'dot' + (c === 'live' || c === 'demo' ? ' live' : c === 'connecting' ? ' wait' : ' bad');
+  $('#cConnT').textContent = c === 'live' ? 'live' : c === 'demo' ? 'demo' : c === 'connecting' ? 'connecting' : 'offline';
+  dirty = true;
+}
+function connect() {
+  if (DEMO) { demo.start(); return; }
+  setConn('connecting');
+  try { ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws'); }
+  catch (e) { retry(); return; }
+  ws.binaryType = 'arraybuffer';
+  ws.onopen = () => { backoff = 500; setConn('live'); S.rateSent = null; applyRate(); };
+  ws.onmessage = (ev) => { if (typeof ev.data === 'string') onText(ev.data); else onBinary(ev.data); };
+  ws.onclose = () => {
+    setConn('offline');
+    for (const p of pending.values()) p.rej(new Error('disconnected'));
+    pending.clear();
+    retry();
+  };
+  ws.onerror = () => {};
+}
+function retry() { clearTimeout(retryT); retryT = setTimeout(connect, backoff); backoff = Math.min(backoff * 2, 5000); }
+function send(obj) {
+  return new Promise((res, rej) => {
+    if (DEMO) { res(demo.command(obj)); return; }
+    if (!ws || ws.readyState !== 1) { rej(new Error('not connected')); return; }
+    const id = nextId++;
+    const msg = Object.assign({}, obj, { id });
+    pending.set(id, { res, rej, t: performance.now() });
+    ws.send(JSON.stringify(msg));
+    setTimeout(() => { if (pending.has(id)) { pending.delete(id); rej(new Error('no reply (timeout)')); } }, 5000);
+  });
+}
+// send, log, and tell the user when the arm refuses
+async function cmd(obj, okText) {
+  logLine('o', JSON.stringify(obj));
+  try {
+    const r = await send(obj);
+    logLine(r.ok ? '' : 'bad', JSON.stringify(r));
+    if (!r.ok) toast(r.error || 'refused', 'bad');
+    else if (okText) toast(okText, 'ok');
+    return r;
+  } catch (e) { toast(e.message, 'bad'); logLine('bad', e.message); return null; }
+}
+const onStage = () => PAGES[page].where !== 'wide';
+const liveRate = () => S.hidden ? 0 : onStage() ? S.rate : Math.min(5, S.rate);
+function applyRate() {
+  if (DEMO || !ws || ws.readyState !== 1) return;
+  const want = { frame_hz: liveRate(), status: 'change', health: !S.hidden };
+  const key = JSON.stringify(want);
+  if (key === S.rateSent) return;
+  S.rateSent = key;
+  send(Object.assign({ cmd: 'ws_rate' }, want)).catch(() => { S.rateSent = null; });
+}
+document.addEventListener('visibilitychange', () => { S.hidden = document.visibilityState === 'hidden'; applyRate(); });
+function onText(txt) {
+  let m;
+  try { m = JSON.parse(txt); } catch (e) { try { m = JSON.parse(txt.replace(/-?\bnan\b|-?\binf\b/gi, 'null')); } catch (e2) { return; } }
+  if (m.t === 'hello') onHello(m.r);
+  else if (m.t === 's') onStatus(m.r);
+  else if (m.t === 'r') {
+    const p = pending.get(m.id);
+    if (p) { pending.delete(m.id); S.rtt = performance.now() - p.t; p.res(m.r || {}); }
+  }
+}
+function onBinary(buf) {
+  if (buf.byteLength < 8) return;
+  const magic = new DataView(buf).getUint32(0, true);
+  if (magic === 0x54464152) { const f = parseFrame(buf); if (f) onFrame(f); }          // "RAFT": the leader frame
+  else if (magic === 0x48544652) { const hm = parseHealth(buf); if (hm) onHealth(hm); }  // "RFTH": the health message
+}
+function parseFrame(buf) {
+  if (buf.byteLength < 160) return null;
+  const v = new DataView(buf);
+  if (v.getUint32(0, true) !== 0x54464152) return null;            // "RAFT"
+  const f = { mode: v.getUint8(5), flags: v.getUint16(6, true), seq: v.getUint32(8, true), tUs: v.getUint32(12, true),
+              q: [], qd: [], tau: [], grav: [], tcp: [], temp: [], events: v.getUint8(159) };
+  for (let i = 0; i < 7; i++) {
+    f.q.push(v.getFloat32(16 + 4 * i, true)); f.qd.push(v.getFloat32(44 + 4 * i, true));
+    f.tau.push(v.getFloat32(72 + 4 * i, true)); f.grav.push(v.getFloat32(100 + 4 * i, true));
+    f.temp.push(v.getUint8(152 + i));
+  }
+  for (let i = 0; i < 6; i++) f.tcp.push(v.getFloat32(128 + 4 * i, true));
+  // version 2 (288 bytes): measured current and voltage, teleoperation state (src/main/leader_frame.h)
+  if (v.getUint8(4) >= 2 && buf.byteLength >= 288) {
+    f.cur = []; f.volt = []; f.qF = []; f.tgtF = []; f.text = [];
+    for (let i = 0; i < 7; i++) { f.cur.push(v.getInt16(160 + 2 * i, true)); f.volt.push(v.getUint8(174 + i) / 10); f.qF.push(v.getFloat32(184 + 4 * i, true)); }
+    for (let i = 0; i < 6; i++) { f.tgtF.push(v.getFloat32(212 + 4 * i, true)); f.text.push(v.getFloat32(236 + 4 * i, true)); }
+    Object.assign(f, { stage: v.getUint8(181), tf: v.getUint8(182), locks: v.getUint8(183), grip: v.getFloat32(260, true), ftick: v.getUint32(264, true),
+                       prec: v.getFloat32(268, true), guide: v.getUint8(272), pc: v.getFloat32(276, true), off: v.getFloat32(280, true) });
+  }
+  return f;
+}
+// the health message (src/main/web_bridge.h), in the shape the status's old "sys" object had
+function parseHealth(buf) {
+  const v = new DataView(buf);
+  if (buf.byteLength < 180 || v.getUint32(0, true) !== 0x48544652 || v.getUint8(4) !== 1) return null;
+  const u = (o) => v.getUint32(o, true), fl = (o) => v.getFloat32(o, true), flags = v.getUint8(5);
+  const loop = { seq: u(8), ticks: u(12), target_hz: fl(16), hz: fl(20), period_us: [u(24), fl(32), u(28)], jitter_us: fl(36), work_us: [fl(40), u(44)],
+                 read_us: [fl(48), u(64)], lock_us: [fl(52), u(68)], app_us: [fl(56), u(72)], write_us: [fl(60), u(76)],
+                 overruns: [u(80), u(88)], failed_reads: [u(84), u(92)] };
+  const missed = [];
+  for (let i = 0; i < 7; i++) missed.push(u(144 + 4 * i));
+  return { loop, cpu: [fl(96), fl(100)], uptime_s: u(104), heap: flags & 4 ? { free: u(108), min: u(112), size: u(116) } : null,
+           stack: flags & 8 ? { control: u(120), network: u(124), loop: u(128) } : null,
+           net: { up: !!(flags & 1), full_duplex: !!(flags & 2), link_mbps: v.getInt16(132, true), web_clients: v.getUint8(134),
+                  tcp_clients: flags & 16 ? v.getUint8(135) : null, web_frames: u(136), udp_frames: flags & 32 ? u(140) : null },
+           missed, stale: [u(172), u(176)] };
+}
+function onFrame(f) {
+  f.at = performance.now();
+  S.f = f; S.fNew = true; S.fCount++;
+  netFrame(f);
+  S.hist.push(f);
+  while (S.hist.length && f.at - S.hist[0].at > 30500) S.hist.shift();
+  if (f.events) for (let b = 0; b < EVENTS.length; b++) if (f.events & (1 << b)) {
+    toast(EVENTS[b][0], EVENTS[b][1]); logLine('ev', 'event: ' + EVENTS[b][0]);
+    if (b === 0 || b === 1) { S.target = null; $('#mvClear').hidden = true; }
+  }
+  if (!S.target && !S.mvInit) { S.mvInit = true; setTargetFrom(f.q.map((v) => v * R2D), false); }
+  dirty = true;
+}
+
+// ---------------------------------------------------------------- hello, status, health
+function onHello(hl) {
+  S.hello = hl;
+  buildMove(); buildStopGrid(); buildAdv(); buildSprings();
+  $('#simCard').hidden = !hl.sim;
+  $('#cHost').textContent = DEMO ? '' : location.hostname || (hl.sys && hl.sys.host) || '';
+  $('#conn').title = 'Firmware ' + hl.fw;
+  $('#navFoot').textContent = hl.fw;
+  logLine('okk', 'connected: firmware ' + hl.fw + (hl.sim ? ' (simulator)' : ''));
+  dirty = true;
+}
+function onStatus(st) {
+  S.st = st;
+  $('#banner').classList.toggle('show', !!st.fault);
+  $('#faultT').textContent = st.fault || '';
+  $('#cModel').hidden = st.model_ok !== false;
+  const u = !!st.unsaved;
+  $('#unsaved').hidden = !u;
+  $('#navSet').hidden = !u;
+  $('#saveTop').textContent = u ? 'Save changes' : 'All saved';
+  $('#saveTop').className = 'btn ' + (u ? 'primary' : 'ghost');
+  $('#navCal').hidden = st.calibrated !== false;
+  if (S.calSeq !== null && st.calib_seq !== S.calSeq && st.last_calib) {
+    toast(st.last_calib, st.last_calib_ok ? 'ok' : 'bad');
+    logLine(st.last_calib_ok ? 'okk' : 'bad', 'calibration: ' + st.last_calib);
+    const m = /^stop: J(\d)/.exec(st.last_calib);
+    if (m && st.last_calib_ok && +m[1] === S.stopJ + 1) stopAdvance(st);
+  }
+  S.calSeq = st.calib_seq;
+  S.calKind = (st.calib || 'idle').split(':')[0];
+  renderCal(st);
+  renderTele(st);
+  renderSettings(st);
+  renderName(st);
+  renderDrive(st);
+  renderServoTest(st, S.f);
+  dirty = true;
+}
+function onHealth(hm) {
+  S.hm = hm;
+  const L = hm.loop;
+  if (L.seq && L.seq !== HL.seq) {
+    HL.seq = L.seq;
+    HL.hist.push([L.period_us[2] / 1000, L.work_us[1] / 1000]);
+    HL.periodMs = 1000 / loopTarget(L);
+    if (HL.hist.length > 120) HL.hist.shift();
+  }
+  const now = performance.now();
+  HL.missed.push([now, hm.missed.slice()]);
+  while (HL.missed.length > 2 && now - HL.missed[0][0] > 10500) HL.missed.shift();
+  renderStatusBar();
+  if (page === 'health') renderHealth();
+}
+
+// ---------------------------------------------------------------- pages, the bottom panel, help, dialogs
+const PAGES = {
+  drive: { t: 'Drive', sub: 'Mode, compensation and moves', where: 'insp' },
+  tele: { t: 'Teleop', sub: 'Couple RAFT to a PAR6', where: 'insp' },
+  cal: { t: 'Calibrate', sub: 'Seven steps, ticked off from the arm', where: 'insp' },
+  servos: { t: 'Servos', sub: 'Test and read the servos', where: 'insp' },
+  set: { t: 'Settings', sub: 'Stored on the arm when you save', where: 'insp' },
+  plots: { t: 'Plots', where: 'wide' },
+  health: { t: 'Health', where: 'wide' },
+};
+let page = PAGES[store.get('page', 'drive')] ? store.get('page', 'drive') : 'drive';
+function showPage(p) {
+  if (p === 'con') { showDock('con', true); setTimeout(() => $('#conIn').focus(), 0); return; }
+  if (!PAGES[p]) return;
+  page = p; store.set('page', p);
+  const wide = PAGES[p].where === 'wide';
+  if (!wide) store.set('lastStage', p);
+  $('#body').classList.toggle('wp', wide);
+  for (const b of $$('#nav [data-p]')) { b.classList.toggle('on', b.dataset.p === p); if (b.dataset.p === p) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); }
+  for (const e of $$('.page')) e.hidden = e.id !== 'p-' + p;
+  if (!wide) { $('#iTitle').textContent = PAGES[p].t; $('#iSub').textContent = PAGES[p].sub; $('#insp').scrollTop = 0; }
+  if (p === 'plots') drawScope();
+  if (p === 'health') { renderHealth(); healthBus(); }
+  if (p === 'servos' && S.st) renderServoTest(S.st, S.f);
+  applyRate();
+  dirty = true;
+}
+for (const b of $$('#nav [data-p]')) b.addEventListener('click', () => showPage(b.dataset.p));
+$('#brand').onclick = (e) => { e.preventDefault(); showPage('drive'); };
+const dockEl = $('#dock');
+let dockTab = store.get('dockTab', 'joints'), dockOpen = store.get('dockOpen', true), dockH = store.get('dockH', 290);
+if (!['joints', 'plot', 'con'].includes(dockTab)) dockTab = 'joints';
+function showDock(t, open) {
+  if (t) { dockTab = t; store.set('dockTab', t); }
+  if (open != null) { dockOpen = open; store.set('dockOpen', open); }
+  if (!onStage() && open) showPage(store.get('lastStage', 'drive'));
+  dockEl.classList.toggle('min', !dockOpen);
+  dockEl.style.height = dockOpen ? clamp(dockH, 150, 900) + 'px' : '';
+  for (const b of $$('.dtabs [data-d]')) b.classList.toggle('on', b.dataset.d === dockTab);
+  for (const k of ['joints', 'plot', 'con']) $('#d-' + k).hidden = !dockOpen || k !== dockTab;
+  $('#chSel').hidden = dockTab !== 'plot' || !dockOpen;
+  if (dockOpen && dockTab === 'plot') { drawLegend(); drawChart(); }
+  if (dockOpen && dockTab === 'joints' && S.f) renderJoints(S.f);
+  if (dockOpen && dockTab === 'con') logEl.scrollTop = logEl.scrollHeight;
+}
+for (const b of $$('.dtabs [data-d]')) b.addEventListener('click', () => showDock(b.dataset.d, true));
+$('#dockToggle').onclick = () => showDock(null, !dockOpen);
+$('#dockGrip').addEventListener('pointerdown', (e) => {
+  if (!dockOpen) return;
+  e.preventDefault();
+  const y0 = e.clientY, h0 = dockEl.getBoundingClientRect().height;
+  const mv = (ev) => { dockH = clamp(h0 - (ev.clientY - y0), 150, Math.max(200, window.innerHeight - 330)); dockEl.style.height = dockH + 'px'; };
+  const up = () => { removeEventListener('pointermove', mv); removeEventListener('pointerup', up); store.set('dockH', dockH); if (dockTab === 'plot') drawChart(); };
+  addEventListener('pointermove', mv); addEventListener('pointerup', up);
+});
+// every card with an explanation gets a (?) that shows it
+for (const c of $$('.card')) {
+  if (!c.querySelector('.help')) continue;
+  const h3 = c.querySelector('h3');
+  if (!h3) continue;
+  h3.append(h('button', { class: 'qh', type: 'button', title: 'What is this?', 'aria-label': 'Explain', onclick: () => c.classList.toggle('helpon') }, '?'));
+}
+// a confirmation inside the page
+let askDone = null;
+function ask(text, yes) {
+  return new Promise((res) => {
+    $('#askT').textContent = text;
+    $('#askYes').textContent = yes || 'Continue';
+    $('#ask').hidden = false;
+    askDone = (v) => { $('#ask').hidden = true; askDone = null; res(v); };
+    $('#askYes').focus();
+  });
+}
+$('#askYes').onclick = () => askDone && askDone(true);
+$('#askNo').onclick = () => askDone && askDone(false);
+$('#ask').addEventListener('click', (e) => { if (e.target.id === 'ask' && askDone) askDone(false); });
+
+// ---------------------------------------------------------------- Drive
+const MODE_HINT = {
+  limp: 'No torque: the arm moves freely, the servos only report.',
+  gravity: 'The arm floats: each joint carries its own weight. Let go anywhere.',
+  move: 'The arm keeps its pose and follows moves. Grabbing it hard hands it back to Gravity.',
+  bilateral: 'Coupled to PAR6 (Teleop): PAR6 follows the arm.',
+};
+function renderMode(m) {
+  if (m === S.mode) return;
+  S.mode = m;
+  for (const b of $$('#modes button')) b.classList.toggle('on', b.dataset.m === (m === 'bilateral' ? 'move' : m));
+  $('#modeHint').textContent = MODE_HINT[m] || '';
+}
+function buildPerJoint() {
+  const box = $('#pj');
+  for (let i = 0; i < 7; i++) {
+    const g = h('input', { type: 'number', id: 'jg' + i, min: '0', max: '3', step: '0.05', 'aria-label': 'J' + (i + 1) + ' gravity factor' });
+    const d = h('input', { type: 'number', id: 'jd' + i, min: '0', max: '0.2', step: '0.005', 'aria-label': 'J' + (i + 1) + ' damping' });
+    g.onchange = () => cmd({ cmd: 'joint_gravity', joint: i + 1, value: +g.value });
+    d.onchange = () => cmd({ cmd: 'joint_damping', joint: i + 1, value: +d.value });
+    box.append(h('b', null, 'J' + (i + 1)), g, d);
+  }
+}
+function renderDrive(st) {
+  if (typeof st.gravity_scale === 'number' && !focused($('#gs'))) { $('#gs').value = st.gravity_scale; $('#gsV').textContent = st.gravity_scale.toFixed(2); }
+  if (typeof st.hold_friction === 'number' && !focused($('#hf'))) { $('#hf').value = st.hold_friction; $('#hfV').textContent = st.hold_friction.toFixed(2); }
+  if (typeof st.hold_stiffness === 'number' && !focused($('#hk'))) { $('#hk').value = st.hold_stiffness; $('#hkV').textContent = st.hold_stiffness.toFixed(2); }
+  if (typeof st.hold_position === 'boolean') {
+    if (!focused($('#hpos'))) $('#hpos').checked = st.hold_position;
+    const pm = st.pos_mask || 0, js = [0, 1, 2, 3, 4, 5, 6].filter((i) => pm & (1 << i)).map((i) => 'J' + (i + 1));
+    $('#hposNow').hidden = !js.length;
+    $('#hposNow').textContent = 'In position mode now: ' + js.join(' ');
+  }
+  if (Array.isArray(st.joint_gravity)) st.joint_gravity.forEach((v, i) => { const e = $('#jg' + i); if (e && !focused(e)) e.value = v.toFixed(2); });
+  if (Array.isArray(st.joint_damping)) st.joint_damping.forEach((v, i) => { const e = $('#jd' + i); if (e && !focused(e)) e.value = v.toFixed(3); });
+  if (st.mode) renderMode(st.mode);
+}
+function buildMove() {
+  const box = $('#mvSliders');
+  box.innerHTML = '';
+  S.hello.lim_deg.forEach((lim, i) => {
+    const r = h('input', { type: 'range', min: lim[0], max: lim[1], step: '0.5', value: 0, 'data-j': i, 'aria-label': 'J' + (i + 1) + ' target',
+      oninput: (e) => { if (!S.target) S.target = (S.f ? S.f.q.map((v) => v * R2D) : [0, 0, 0, 0, 0, 0, 0]); S.target[i] = +e.target.value; showTarget(); } });
+    box.append(h('div', { class: 'mv' }, h('b', null, 'J' + (i + 1)), r, h('span', { class: 'num right', id: 'mvV' + i }, '0.0°')));
+  });
+}
+function setTargetFrom(deg, show) {
+  if (!S.hello) return;
+  S.hello.lim_deg.forEach((lim, i) => {
+    const v = clamp(deg[i] || 0, lim[0], lim[1]);
+    const r = $('#mvSliders [data-j="' + i + '"]');
+    if (r) r.value = v;
+    const t = $('#mvV' + i);
+    if (t) t.textContent = v.toFixed(1) + '°';
+  });
+  if (show) { S.target = deg.slice(); $('#mvClear').hidden = false; }
+  dirty = true;
+}
+function showTarget() {
+  S.target.forEach((v, i) => { const t = $('#mvV' + i); if (t) t.textContent = v.toFixed(1) + '°'; });
+  $('#mvClear').hidden = false;
+  dirty = true;
+}
+$('#mvCopy').onclick = () => { if (S.f) setTargetFrom(S.f.q.map((v) => v * R2D), true); };
+$('#mvClear').onclick = () => { S.target = null; $('#mvClear').hidden = true; dirty = true; };
+$('#mvSpeed').oninput = (e) => { $('#mvSpeedV').textContent = e.target.value + '°/s'; };
+$('#mvGo').onclick = () => {
+  const q = S.target || (S.f ? S.f.q.map((v) => v * R2D) : null);
+  if (!q) return;
+  cmd({ cmd: 'move', q_deg: q.map((v) => +v.toFixed(2)), speed_deg: +$('#mvSpeed').value });
+};
+$('#mvZero').onclick = () => { setTargetFrom([0, 0, 0, 0, 0, 0, 0], true); cmd({ cmd: 'move', q_deg: [0, 0, 0, 0, 0, 0, 0], speed_deg: +$('#mvSpeed').value }); };
+$('#mvRest').onclick = () => { setTargetFrom(S.hello.rest_deg, true); cmd({ cmd: 'rest' }); };
+for (const b of $$('#modes button')) b.onclick = () => cmd({ cmd: 'mode', mode: b.dataset.m });
+$('#gs').oninput = (e) => { $('#gsV').textContent = (+e.target.value).toFixed(2); };
+$('#gs').onchange = (e) => cmd({ cmd: 'gravity_scale', value: +e.target.value });
+$('#hf').oninput = (e) => { $('#hfV').textContent = (+e.target.value).toFixed(2); };
+$('#hf').onchange = (e) => cmd({ cmd: 'hold_friction', value: +e.target.value });
+$('#hpos').onchange = (e) => cmd({ cmd: 'hold_position', on: e.target.checked });
+$('#hk').oninput = (e) => { $('#hkV').textContent = (+e.target.value).toFixed(2); };
+$('#hk').onchange = (e) => cmd({ cmd: 'hold_stiffness', value: +e.target.value });
+const limp = () => cmd({ cmd: 'mode', mode: 'limp' });
+const save = () => cmd({ cmd: 'save' }, 'Saved to flash');
+$('#limp').onclick = limp;
+$('#saveTop').onclick = save;
+for (const b of $$('.save')) b.onclick = save;
+$('#faultClear').onclick = () => cmd({ cmd: 'clear_fault' }, 'Fault cleared');
+
+// ---------------------------------------------------------------- the Joints panel
+const ktOf = (i) => (S.st && S.st.kt && S.st.kt[i]) || 0.441;
+const mA = (f, i) => f.tau[i] / ktOf(i) * 1000;                     // commanded, from the torque (signed, joint sense)
+const mAm = (f, i) => f.cur ? f.cur[i] : NaN;                         // measured by the servo (signed, joint sense)
+const mAg = (f, i) => f.grav[i] / ktOf(i) * 1000;                     // what the model's gravity load needs here
+const ang = (rad) => S.units === 'rad' ? fix(rad, 3) : fix(rad * R2D, 1);
+function buildJoints() {
+  const t = $('#jtab');
+  const th = (x, u, title) => h('th', title ? { title } : null, x, h('small', null, u || ' '));
+  t.append(h('thead', null, h('tr', null, th('Joint'), th('Angle', h('span', { id: 'jAh' }, '°')), th('Range', '', 'Where the joint is within its range; the tick marks zero'), th('Speed', '°/s'),
+    th('Current', 'mA', 'Measured by the servo; the mark is the rated 350 mA'), th('Cmd', 'mA', 'Commanded: torque / Kt. "pos": the servo runs its own position mode'),
+    th('Model', 'mA', "What the model's gravity load needs here"), th('Torque', 'mNm'), th('Temp', '°C'), th('Supply', 'V'), th('Missed', '/s', 'Failed servo reads per second over the last 10 s'))));
+  const tb = h('tbody');
+  for (let i = 0; i < 7; i++) {
+    tb.append(h('tr', { id: 'jr' + i }, h('td', null, h('b', null, 'J' + (i + 1)), h('small', null, NAMES[i])), h('td', { id: 'jA' + i }, '-'),
+      h('td', null, h('span', { class: 'rbar' }, h('b', { id: 'jZ' + i }), h('i', { id: 'jP' + i }))), h('td', { id: 'jS' + i }, '-'),
+      h('td', null, h('span', { class: 'ibar' }, h('i', { id: 'jIb' + i }), h('b')), h('span', { id: 'jI' + i }, '-')),
+      h('td', { id: 'jC' + i }, '-'), h('td', { id: 'jM' + i }, '-'), h('td', { id: 'jT' + i }, '-'), h('td', null, h('span', { class: 'tc', id: 'jK' + i }, '-')),
+      h('td', { id: 'jV' + i }, '-'), h('td', { id: 'jX' + i }, '-')));
+  }
+  t.append(tb);
+}
+function missRates() {
+  const M = HL.missed;
+  if (M.length < 2) return null;
+  const a = M[0], b = M[M.length - 1], dt = (b[0] - a[0]) / 1000;
+  return dt > 0.5 ? b[1].map((v, i) => (v - a[1][i]) / dt) : null;
+}
+function renderJoints(f) {
+  const lim = S.hello ? S.hello.lim_deg : null, rates = missRates(), pm = (S.st && S.st.pos_mask) || 0;
+  for (let i = 0; i < 7; i++) {
+    const deg = f.q[i] * R2D;
+    $('#jA' + i).textContent = ang(f.q[i]);
+    if (lim) {
+      const span = lim[i][1] - lim[i][0];
+      $('#jP' + i).style.left = clamp((deg - lim[i][0]) / span * 100, 0, 100) + '%';
+      $('#jZ' + i).style.left = clamp(-lim[i][0] / span * 100, 0, 100) + '%';
+    }
+    $('#jS' + i).textContent = fix(f.qd[i] * R2D, 0);
+    const m = mAm(f, i), am = Math.abs(m), bar = $('#jIb' + i);
+    bar.style.width = isFinite(am) ? clamp(am / STALL_MA * 100, 0, 100) + '%' : '0';
+    bar.className = am > 2 * RATED_MA ? 'h' : am > RATED_MA ? 'w' : '';
+    $('#jI' + i).textContent = fix(m, 0);
+    $('#jC' + i).textContent = pm & (1 << i) ? 'pos' : fix(mA(f, i), 0);
+    $('#jM' + i).textContent = fix(mAg(f, i), 0);
+    $('#jT' + i).textContent = fix(f.tau[i] * 1000, 0);
+    const t = f.temp[i], tc = $('#jK' + i);
+    tc.className = 'tc' + (t >= 65 ? ' h' : t >= 55 ? ' w' : '');
+    tc.textContent = t;
+    $('#jV' + i).textContent = f.volt ? fix(f.volt[i], 1) : '-';
+    const r = rates ? rates[i] : null, x = $('#jX' + i);
+    x.textContent = r == null ? '-' : r > 0 ? r.toFixed(r < 10 ? 1 : 0) : '0';
+    x.className = r > 0 ? 'miss' : '';
+    if (S.hm) x.title = S.hm.missed[i] + ' since the arm started';
+  }
+}
+// ---------------------------------------------------------------- the live plot, last 30 s of frames
+const CHARTS = {
+  cur: { unit: 'mA', span: 100, names: ['J2 commanded', 'J2 measured', 'J3 commanded', 'J3 measured'], fn: (f) => [mA(f, 1), mAm(f, 1), mA(f, 2), mAm(f, 2)] },
+  volt: { unit: 'V', span: 0.5, names: ['J1', 'J2', 'J3', 'J4', 'J5', 'J6', 'J7'], fn: (f) => f.volt || [NaN, NaN, NaN, NaN, NaN, NaN, NaN] },
+  tau: { unit: 'Nm', span: 0.05, names: ['J2 command', 'J2 gravity', 'J3 command', 'J3 gravity'], fn: (f) => [f.tau[1], f.grav[1], f.tau[2], f.grav[2]] },
+  temp: { unit: '°C', span: 5, names: ['J1', 'J2', 'J3', 'J4', 'J5', 'J6', 'J7'], fn: (f) => f.temp },
+  q: { unit: 'deg', span: 10, names: ['J1', 'J2', 'J3', 'J4', 'J5', 'J6', 'J7'], fn: (f) => f.q.map((v) => v * R2D) },
+  qd: { unit: 'deg/s', span: 10, names: ['J1', 'J2', 'J3', 'J4', 'J5', 'J6', 'J7'], fn: (f) => f.qd.map((v) => v * R2D) },
+  tcp: { unit: 'mm', span: 10, names: ['X', 'Y', 'Z'], fn: (f) => f.tcp.slice(0, 3).map((v) => v * 1000) },
+  meas: { unit: 'mA', span: 100, names: ['J1', 'J2', 'J3', 'J4', 'J5', 'J6', 'J7'], fn: (f) => f.cur || [NaN, NaN, NaN, NaN, NaN, NaN, NaN] },
+};
+const chartSel = $('#chSel');
+chartSel.value = CHARTS[store.get('chart', 'q')] ? store.get('chart', 'q') : 'q';
+chartSel.onchange = () => { store.set('chart', chartSel.value); drawLegend(); drawChart(); };
+function drawLegend() {
+  const c = CHARTS[chartSel.value];
+  $('#chLegend').innerHTML = '';
+  c.names.forEach((n, k) => $('#chLegend').append(h('span', null, h('i', { style: 'background:' + SERIES[k] }), n)));
+}
+function fitCanvas(el) {
+  const r = el.getBoundingClientRect();
+  if (!r.width || !r.height) return null;
+  const dpr = Math.min(window.devicePixelRatio || 1, 2), g = el.getContext('2d');
+  if (el.width !== Math.round(r.width * dpr) || el.height !== Math.round(r.height * dpr)) { el.width = Math.round(r.width * dpr); el.height = Math.round(r.height * dpr); }
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  g.clearRect(0, 0, r.width, r.height);
+  return { g, w: r.width, hh: r.height };
+}
+function drawChart() {
+  const fc = fitCanvas($('#chart'));
+  if (!fc) return;
+  const { g, w, hh } = fc;
+  const c = CHARTS[chartSel.value], hist = S.hist, data = hist.map(c.fn);
+  if (data.length < 2) return;
+  let lo = Infinity, hi = -Infinity;
+  for (const row of data) for (const v of row) { if (v < lo) lo = v; if (v > hi) hi = v; }
+  if (!isFinite(lo)) return;                           // nothing to draw (e.g. a version 1 frame has no measured current)
+  if (hi - lo < c.span) { const mid = (hi + lo) / 2; lo = mid - c.span / 2; hi = mid + c.span / 2; }
+  const m = (hi - lo) * 0.12; hi += m; lo -= m;
+  const now = hist[hist.length - 1].at, X = (t) => 40 + (w - 46) * (1 - (now - t) / 30000), Y = (v) => 6 + (hh - 22) * (1 - (v - lo) / (hi - lo));
+  g.font = '10px ui-monospace,Consolas,monospace'; g.fillStyle = C.faint; g.strokeStyle = C.grid2; g.lineWidth = 1;
+  for (let k = 0; k <= 3; k++) {
+    const v = lo + (hi - lo) * k / 3, y = Y(v);
+    g.globalAlpha = 0.5; g.beginPath(); g.moveTo(40, y); g.lineTo(w - 4, y); g.stroke(); g.globalAlpha = 1;
+    g.fillText(Math.abs(hi - lo) < 3 ? v.toFixed(2) : v.toFixed(0), 2, y + 3);
+  }
+  for (let s = 0; s <= 30; s += 10) g.fillText(s ? '-' + s + ' s' : 'now', X(now - s * 1000) - (s ? 14 : 22), hh - 4);
+  g.textAlign = 'right'; g.fillText(c.unit, w - 6, 12); g.textAlign = 'left';
+  for (let s = 0; s < data[0].length; s++) {
+    g.strokeStyle = SERIES[s % SERIES.length]; g.lineWidth = 1.6; g.beginPath();
+    let pen = false;
+    data.forEach((row, k) => { const x = X(hist[k].at), y = Y(row[s]); if (!isFinite(y)) { pen = false; return; } if (pen) g.lineTo(x, y); else g.moveTo(x, y); pen = true; });
+    g.stroke();
+  }
+}
+
+// ---------------------------------------------------------------- Calibrate
+async function needLimp(what) {
+  const m = S.f ? MODES[S.f.mode] : 'limp';
+  if (m === 'limp') return true;
+  if (!await ask(what + ' needs the arm limp. Hold the arm now: it will lose torque.', 'Go limp and continue')) return false;
+  await cmd({ cmd: 'mode', mode: 'limp' });
+  return true;
+}
+// Guided stop calibration (step 1): the current joint, its stop angle from the firmware, and what to do now
+const STOP_NAMES = ['J1 base', 'J2 shoulder', 'J3 elbow', 'J4', 'J5', 'J6', 'Trigger'];
+S.stopJ = 0;
+const stopDone = (st, i) => !!((st.cal_flags || [])[i] & 1);
+function stopAdvance(st) {
+  for (let k = 1; k <= 7; k++) { const i = (S.stopJ + k) % 7; if (!stopDone(st, i)) { S.stopJ = i; return; } }
+}
+function buildStopGrid() {
+  const g = $('#stopGrid');
+  g.innerHTML = '';
+  for (let i = 0; i < 7; i++) g.append(h('button', { class: 'btn', id: 'stopB' + i, onclick: () => { S.stopJ = i; if (S.st) renderStop(S.st); } }, 'J' + (i + 1)));
+}
+function renderStop(st) {
+  if (!S.stopInit && st.cal_flags) {                  // start at the first joint not yet done
+    S.stopInit = true;
+    const first = [0, 1, 2, 3, 4, 5, 6].find((i) => !stopDone(st, i));
+    if (first !== undefined) S.stopJ = first;
+  }
+  const j = S.stopJ, deg = (st.stop_deg || [])[j];
+  const running = (st.calib || '').startsWith('stop:') && st.calib_joint === j + 1;
+  const where = deg === undefined ? '' : ' (it reads ' + deg.toFixed(1) + '° there)';
+  const box = $('#stopNow');
+  box.classList.toggle('run', running);
+  if (running) box.innerHTML = '<b>' + STOP_NAMES[j] + ':</b> hold it still against the stop...';
+  else box.innerHTML = '<b>' + STOP_NAMES[j] + ':</b> turn it gently against its mechanical stop' + where + ', keep it there, then press Capture.';
+  $('#stopCap').textContent = 'Capture ' + (j === 6 ? 'trigger' : 'J' + (j + 1)) + ' at its stop';
+  $('#stopCap').disabled = (st.calib || 'idle') !== 'idle';
+  for (let i = 0; i < 7; i++) {
+    const b = $('#stopB' + i);
+    if (!b) continue;
+    const done = stopDone(st, i);
+    b.classList.toggle('done', done);
+    b.classList.toggle('cur', i === j);
+    b.textContent = 'J' + (i + 1) + (done ? ' ✓' : '');
+    b.title = st.stop_deg ? 'stop at ' + st.stop_deg[i].toFixed(2) + '°' : '';
+  }
+}
+$('#stopCap').onclick = async () => { if (await needLimp('Stop calibration')) cmd({ cmd: 'calib_stop', joint: S.stopJ + 1 }); };
+$('#stopSkip').onclick = () => { S.stopJ = (S.stopJ + 1) % 7; if (S.st) renderStop(S.st); };
+function buildSprings() {
+  const sel = $('#spSel');
+  sel.innerHTML = '';
+  sel.append(h('option', { value: 'none' }, 'No spring'));
+  for (const s of S.hello.springs || []) sel.append(h('option', { value: s.name }, s.name + ' (' + s.shop + ', ' + s.k + ' N/m, a ' + s.a_mm + ' / b ' + s.b_mm + ' mm)'));
+  sel.append(h('option', { value: 'custom' }, 'Custom'));
+  sel.onchange = () => {
+    const s = (S.hello.springs || []).find((x) => x.name === sel.value);
+    if (s) { $('#spK').value = s.k; $('#spA').value = s.a_mm; $('#spB').value = s.b_mm; }
+  };
+}
+$('#spApply').onclick = () => {
+  if ($('#spSel').value === 'none') { cmd({ cmd: 'spring', type: 'none' }, 'Spring removed from the model'); return; }
+  cmd({ cmd: 'spring', type: 'cable', k: +$('#spK').value, a_mm: +$('#spA').value, b_mm: +$('#spB').value }, 'Spring set');
+};
+$('#cZero').onclick = async () => { if (await needLimp('Zero calibration')) cmd({ cmd: 'calib_zero' }); };
+$('#cHold').onclick = () => cmd({ cmd: 'mode', mode: 'move' });
+$('#cPose45').onclick = () => { setTargetFrom([0, 45, 45, 0, 0, 0, 0], true); cmd({ cmd: 'move', q_deg: [0, 45, 45, 0, 0, 0, 0], speed_deg: 20 }); };
+$('#cSpring').onclick = () => cmd({ cmd: 'calib_spring' });
+$('#cGrav').onclick = () => cmd({ cmd: 'mode', mode: 'gravity' });
+$('#calAbort').onclick = () => cmd({ cmd: 'calib_abort' });
+function renderCal(st) {
+  renderStop(st);
+  const fl = st.cal_flags || [];
+  const all = (bit) => fl.length === 7 && fl.every((v) => v & bit);
+  const zero = all(1), dirs = all(2);
+  const spring = st.spring && st.spring.type !== 0;
+  const scaled = spring && Math.abs(st.spring.scale - 1) > 5e-4;
+  if (zero && dirs && st.mode !== 'limp') S.torqueSeen = true;   // first torque: ticked once torque has been on
+  const saved = zero && dirs && !st.unsaved;
+  // Kt comes from the datasheet and the joint ranges from the design, so neither is a step here
+  const done = [zero, dirs, spring, saved, !!S.torqueSeen, scaled, saved && !!S.torqueSeen && (scaled || !spring)];
+  const optional = [false, false, true, false, false, !spring, false];   // spring strength only with a spring
+  const stText = [zero ? 'done' : fl.filter((v) => v & 1).length + ' / 7', 'fixed', spring ? st.spring.k.toFixed(0) + ' N/m' : 'optional', '', '',
+                  scaled ? '×' + st.spring.scale.toFixed(3) : spring ? '' : 'needs a spring', ''];
+  const now = done.findIndex((d, i) => !d && !optional[i]);
+  for (let i = 0; i < 7; i++) {
+    const el = $('#st' + (i + 1));
+    el.classList.toggle('done', done[i]);
+    el.classList.toggle('now', i === now);
+    el.querySelector('.st').textContent = stText[i];
+  }
+  if (!S.calOpened && now >= 0) { S.calOpened = true; $('#st' + (now + 1)).open = true; }
+  if (!S.spInit && st.spring && S.hello) {
+    S.spInit = true;
+    const p = (S.hello.springs || []).find((x) => Math.abs(x.k - st.spring.k) < 0.5 && Math.abs(x.a_mm - st.spring.a_mm) < 0.5 && Math.abs(x.b_mm - st.spring.b_mm) < 0.5);
+    $('#spSel').value = !spring ? 'none' : p ? p.name : 'custom';
+    $('#spK').value = st.spring.k.toFixed(0); $('#spA').value = st.spring.a_mm.toFixed(0); $('#spB').value = st.spring.b_mm.toFixed(0);
+  }
+  $('#spNow').textContent = spring ? 'now: ' + st.spring.k.toFixed(0) + ' N/m, a ' + st.spring.a_mm.toFixed(0) + ', b ' + st.spring.b_mm.toFixed(0) + ' mm' : 'now: none';
+  $('#spScale').textContent = spring ? 'Spring scale ' + st.spring.scale.toFixed(3) + (scaled ? ' (measured)' : ' (as specified)') : 'Set a spring in step 3 first.';
+  const active = (st.calib || 'idle') !== 'idle';
+  $('#calState').textContent = active ? 'running' : st.calibrated ? 'calibrated' : 'not calibrated';
+  $('#calState').className = 'chip' + (active ? ' warn' : st.calibrated ? ' ok' : ' warn');
+  $('#calText').textContent = active ? st.calib + (st.calib_joint ? ' (J' + st.calib_joint + ')' : '') : (st.last_calib ? 'Last: ' + st.last_calib : 'Idle.');
+  $('#calBar').hidden = !active;
+  $('#calAbortRow').hidden = !active;
+  $('#cCalib').hidden = !active;
+}
+
+// ---------------------------------------------------------------- Teleop
+const STAGES = ['WAIT_PAIRED', 'ALIGNING', 'CLAIMING', 'COUPLED'];
+const CLAIMED = ['COUPLED', 'HELD', 'REALIGNING'];
+$('#tStart').onclick = () => {
+  const host = $('#piHost').value.trim(), o = { cmd: 'teleop_start', offset: $('#tOffset').checked };
+  if (host) o.host = host;
+  cmd(o);
+};
+$('#tStop').onclick = () => cmd({ cmd: 'teleop_stop' });
+$('#tResume').onclick = () => cmd({ cmd: 'teleop_resume' });
+$('#tRealign').onclick = () => cmd({ cmd: 'teleop_realign' });
+$('#tHold').onclick = () => cmd({ cmd: 'teleop_hold', on: !(S.st && S.st.hold) });
+$('#tOffset').onchange = (e) => cmd({ cmd: 'teleop_offset', on: e.target.checked });
+$('#tPrec').oninput = (e) => { $('#tPrecV').textContent = (+e.target.value).toFixed(2); };
+$('#tPrec').onchange = (e) => cmd({ cmd: 'teleop_precision', value: +e.target.value });
+for (let i = 0; i < 6; i++) $('#tLocks').append(h('label', { title: 'Keep PAR6 J' + (i + 1) + ' still' }, h('input', { type: 'checkbox', id: 'tl' + i, onchange: () => {
+  const joints = [];
+  for (let k = 0; k < 6; k++) if ($('#tl' + k).checked) joints.push(k + 1);
+  cmd({ cmd: 'teleop_lock', joints });
+} }), 'J' + (i + 1)));
+$('#tOri').onchange = (e) => cmd({ cmd: 'orient_lock', on: e.target.checked });
+$('#tGuide').onchange = (e) => cmd({ cmd: 'guide', type: e.target.value });
+$('#showFol').checked = S.showFol;
+$('#showFol').onchange = (e) => { S.showFol = e.target.checked; store.set('showFol', S.showFol); dirty = true; };
+$('#stMe').onclick = () => cmd({ cmd: 'stream', port: +$('#stPort').value || 5005 }, 'Leader frames now go to this computer');
+$('#tRate').onchange = (e) => cmd({ cmd: 'teleop_rate', hz: +e.target.value }, 'Link: ' + e.target.selectedOptions[0].textContent);
+$('#tFilt').onchange = (e) => cmd({ cmd: 'teleop_filter', hz: +e.target.value }, +e.target.value > 0 ? 'Target filter ' + e.target.value + ' Hz' : 'Target filter off');
+const btnState = (has, down) => has ? (down ? 'pressed' : 'up') : 'not wired';
+function renderTele(st) {
+  if (!focused($('#piHost')) && st.pi_host && !$('#piHost').value) $('#piHost').value = st.pi_host;
+  const stage = st.teleop || 'OFF', claimed = CLAIMED.includes(stage), off = stage === 'OFF';
+  const k = claimed ? 3 : STAGES.indexOf(stage);
+  $$('#pipe span').forEach((s, i) => { s.className = k < 0 ? '' : i < k ? 'done' : i === k ? 'cur' : ''; });
+  $('#pipe').classList.toggle('coupled', stage === 'COUPLED');
+  const cls = stage === 'COUPLED' ? 'ok' : stage === 'HELD' || stage === 'LOST' || stage === 'REALIGNING' ? 'warn' : off ? '' : 'nav';
+  $('#tStage').textContent = stage;
+  $('#tStage').className = 'chip ' + cls;
+  const note = st.teleop_note || '';
+  $('#tNote').hidden = !note;
+  $('#tNote').textContent = note;
+  $('#tOffL').style.color = /RAFT reaches/.test(note) ? 'var(--warntext)' : '';
+  if (!focused($('#tOffset'))) $('#tOffset').checked = !!st.offset_align;
+  $('#tStart').disabled = !off;
+  $('#tStop').disabled = off;
+  $('#tResume').hidden = stage !== 'LOST';
+  $('#tRealign').disabled = !(stage === 'COUPLED' || stage === 'HELD');
+  $('#tHold').textContent = st.hold ? 'Release hold' : 'Hold PAR6';
+  $('#tHold').className = 'btn big grow' + (st.hold ? ' held' : '');
+  $('#tHold').disabled = off && !st.hold;
+  $('#tLink').textContent = st.link || '-';
+  $('#tErr').textContent = st.link_error || 'none';
+  $('#tEng').textContent = st.engaged ? 'yes' : 'no' + (st.hold ? ' (hold)' : st.buttons && st.buttons.clutch_down ? ' (clutch)' : st.settings && st.settings.require_enable ? ' (enable not held)' : '');
+  const b = st.buttons || {};
+  $('#tBtn').textContent = 'enable ' + btnState(b.enable, b.enable_down) + ', clutch ' + btnState(b.clutch, b.clutch_down);
+  if (!focused($('#tPrec')) && st.precision != null) { $('#tPrec').value = st.precision; $('#tPrecV').textContent = st.precision.toFixed(2); }
+  for (let i = 0; i < 6; i++) { const e = $('#tl' + i); if (!focused(e)) e.checked = !!((st.locks || 0) & (1 << i)); }
+  if (!focused($('#tOri'))) $('#tOri').checked = !!st.orient_lock;
+  if (!focused($('#tGuide')) && st.guide) $('#tGuide').value = st.guide;
+  if (!focused($('#tRate')) && st.link_rate_hz != null) $('#tRate').value = String(st.link_rate_hz);
+  $('#tRate').disabled = !off;
+  if (!focused($('#tFilt')) && st.teleop_filter_hz != null) $('#tFilt').value = st.teleop_filter_hz;
+  $('#tFiltLag').textContent = st.teleop_filter_hz > 0 ? '(about ' + (230 / st.teleop_filter_hz).toFixed(1) + ' ms lag)' : '';
+  $('#stTarget').textContent = st.stream && st.stream[0] !== ':' ? st.stream : 'nowhere yet';
+  $('#cCoupled').hidden = !claimed && stage !== 'LOST';
+  $('#cCoupled').textContent = stage === 'COUPLED' ? 'COUPLED' : stage;
+  $('#cCoupled').className = 'chip ' + (stage === 'COUPLED' ? 'ok' : 'warn');
+  $('#navTele').hidden = off;
+  $('#navTele').textContent = stage === 'WAIT_PAIRED' ? 'PAIR' : stage === 'REALIGNING' ? 'ALIGN' : stage.slice(0, 7);
+  $('#navTele').className = 'nb' + (stage === 'COUPLED' ? ' ok' : '');
+}
+// live teleop figures from the frame
+function renderTeleLive(f) {
+  const fol = follower();
+  if (fol) {
+    let e = 0;
+    for (let i = 0; i < 6; i++) e = Math.max(e, Math.abs(f.q[i] - fol[i]) * R2D);
+    $('#tCoup').textContent = e.toFixed(1) + '° (largest joint)';
+  } else $('#tCoup').textContent = '-';
+  const claimed = S.st && CLAIMED.includes(S.st.teleop);
+  $('#tOff').textContent = claimed && f.off != null ? (f.off * R2D).toFixed(1) + '° (largest joint)' : '-';
+  $('#tStale').textContent = S.hm ? S.hm.stale[0] + ' old states, ' + S.hm.stale[1] + ' stale targets' : '-';
+  if (!f.text) return;
+  const valid = f.flags & 256 && f.tf & 2;
+  $('#tExt').textContent = valid ? f.text.map((v) => v.toFixed(2)).join(' ') + ' Nm' : '-';
+  $('#tGrip').textContent = f.flags & 256 && f.grip >= 0 ? f.grip.toFixed(0) + ' / 255' : '-';
+  $('#tPc').textContent = f.mode === 3 ? (f.pc * 1000).toFixed(2) + ' mJ' + (f.pc < 0 ? ' (damping)' : '') : '-';
+}
+
+// ---------------------------------------------------------------- Servos
+$('#stStart').onclick = async () => {
+  if (!await needLimp('Servo position test')) return;
+  $('#stJog').value = 0; $('#stJogV').textContent = '0.0°';
+  cmd({ cmd: 'servo_test', joint: +$('#stJ').value, torque_ma: +$('#stTq').value, speed_deg: +$('#stSp').value });
+};
+$('#stStop').onclick = () => cmd({ cmd: 'servo_test', on: false });
+$('#stJog').oninput = (e) => { $('#stJogV').textContent = (+e.target.value).toFixed(1) + '°'; };
+$('#stJog').onchange = (e) => cmd({ cmd: 'servo_jog', deg: +e.target.value });
+function kvFill(el, rows) {
+  el.innerHTML = '';
+  for (const [k, v] of rows) { el.append(h('dt', null, k)); el.append(h('dd', { class: 'num' }, v)); }
+}
+function renderServoTest(st, f) {
+  const t = st && st.servo_test;
+  $('#stState').textContent = t ? 'J' + t.joint + ' holding' : 'off';
+  $('#stState').className = 'chip' + (t ? ' warn' : '');
+  $('#stJog').disabled = !t;
+  $('#stStart').disabled = !!t;
+  $('#stStop').disabled = !t;
+  if (!t || !f) { if (!t) $('#stVals').innerHTML = ''; return; }
+  const i = t.joint - 1, kt = ktOf(i), ma = f.cur ? f.cur[i] : NaN;
+  kvFill($('#stVals'), [['Position', fix(f.q[i] * R2D, 2) + '°'], ['Target', 'start ' + (t.goal_deg >= 0 ? '+' : '') + t.goal_deg.toFixed(1) + '°'],
+    ['Speed', fix(f.qd[i] * R2D, 1) + ' °/s'], ['Current', fix(ma, 0) + ' mA'], ['Torque', fix(ma * kt, 0) + ' mNm (Kt ' + kt.toFixed(3) + ')'],
+    ['Temperature', f.temp[i] + ' °C'], ['Supply', f.volt ? fix(f.volt[i], 1) + ' V' : '-']]);
+}
+function buildAdv() {
+  const box = $('#advJ');
+  box.innerHTML = '';
+  for (let i = 0; i < 7; i++) {
+    const kt = h('input', { type: 'number', id: 'ak' + i, step: '0.001', style: 'width:84px;height:28px', 'aria-label': 'J' + (i + 1) + ' Kt' });
+    box.append(h('div', { class: 'row small' }, h('b', { style: 'width:26px' }, 'J' + (i + 1)), h('span', { class: 'muted', style: 'width:50px' }, NAMES[i]),
+      h('span', { class: 'grow' }), h('span', { class: 'muted' }, 'Kt'), kt, h('button', { class: 'btn sm', onclick: () => cmd({ cmd: 'set_kt', joint: i + 1, kt: +kt.value }) }, 'Set')));
+  }
+}
+// servo_info: one row per servo, plain-language notes, and one joint's raw registers on request
+$('#svRead').onclick = async () => {
+  const r = await cmd({ cmd: 'servo_info' });
+  if (!r || !r.ok || !Array.isArray(r.servos)) return;
+  const t = $('#svTable');
+  t.innerHTML = '';
+  t.hidden = false;
+  $('#svHint').hidden = true;
+  t.append(h('tr', null, ['Joint', 'ID', 'Mode', 'Supply', 'Temp', 'Position', 'Torque limit', 'Angle limits', 'FW', 'Model', ''].map((x) => h('th', null, x))));
+  for (const s of r.servos) {
+    if (!s.ok) {
+      t.append(h('tr', null, h('td', null, 'J' + s.j), h('td', null, String(s.id)), h('td', { colspan: '9', style: 'text-align:left;color:var(--badtext)' }, 'no answer')));
+      continue;
+    }
+    t.append(h('tr', null, h('td', null, 'J' + s.j), h('td', null, String(s.id)), h('td', null, String(s.mode)), h('td', null, s.volt.toFixed(1) + ' V'),
+      h('td', null, s.temp + ' °C'), h('td', null, String(s.pos)), h('td', null, String(s.tq_limit)), h('td', null, s.lim[0] + '..' + s.lim[1]),
+      h('td', null, s.fw.join('.')), h('td', null, String(s.model)), h('td', null, h('button', { class: 'btn sm ghost', onclick: () => showRaw(s.j) }, 'raw'))));
+  }
+  const ul = $('#svNotes');
+  ul.innerHTML = '';
+  ul.hidden = false;
+  (r.notes && r.notes.length ? r.notes : ['Nothing stands out: every servo answered with plausible values.']).forEach((n) => ul.append(h('li', null, n)));
+};
+async function showRaw(j) {
+  const r = await cmd({ cmd: 'servo_info', joint: j });
+  const s = r && r.ok && r.servos && r.servos[0];
+  if (!s || !s.regs) return;
+  const lines = [];
+  for (let a = 0; a < s.regs.length / 2; a += 16) lines.push(String(a).padStart(2, '0') + ':  ' + s.regs.substr(a * 2, 32).replace(/(..)(?!$)/g, '$1 '));
+  $('#svRaw').hidden = false;
+  $('#svRaw').textContent = 'J' + j + ' (ID ' + s.id + '), registers 0..70, hex\n' + lines.join('\n');
+}
+
+// ---------------------------------------------------------------- Settings
+function renderSettings(st) {
+  if (!focused($('#arOn'))) $('#arOn').checked = !!st.auto_rest;
+  if (!focused($('#arIdle')) && st.idle_s != null) $('#arIdle').value = st.idle_s;
+  if (!focused($('#maUnit')) && st.ma_per_unit != null) $('#maUnit').value = st.ma_per_unit;
+  if (st.kt) for (let i = 0; i < 7; i++) { const e = $('#ak' + i); if (e && !focused(e)) e.value = st.kt[i].toFixed(3); }
+  // teleoperation and haptics: the inputs follow the arm only when its settings change, so an edit is not overwritten
+  const hs = st.settings, js = JSON.stringify(hs);
+  const hasEn = !!(st.buttons && st.buttons.enable);
+  $('#hsEn').disabled = !hasEn && !(hs && hs.require_enable);
+  $('#hsEnL').title = hasEn ? '' : 'needs an enable button wired to the ESP32 (main.cpp ENABLE_BUTTON_PIN)';
+  if (hs && js !== S.hsSeen) {
+    S.hsSeen = js;
+    $('#hsRe').checked = hs.auto_reclaim; $('#hsEn').checked = hs.require_enable; $('#hsPc').checked = hs.passivity; $('#hsBar').checked = hs.barriers_always;
+    $('#hsFg').value = hs.force_gain; $('#hsFs').value = String(hs.force_sign < 0 ? -1 : 1); $('#hsFd').value = hs.force_deadband; $('#hsFr').value = hs.friction_scale;
+    $('#hsTo').value = hs.trigger_deg[0]; $('#hsTc').value = hs.trigger_deg[1]; $('#hsGo').value = hs.gripper_raw[0]; $('#hsGc').value = hs.gripper_raw[1];
+  }
+  if (st.friction_nm) $('#hsFric').textContent = 'measured friction ' + st.friction_nm.map((v) => (v * 1000).toFixed(0)).join(' ') + ' mNm';
+}
+$('#hsSet').onclick = () => cmd({ cmd: 'teleop_settings', auto_reclaim: $('#hsRe').checked, require_enable: $('#hsEn').checked, passivity: $('#hsPc').checked,
+  barriers_always: $('#hsBar').checked, force_gain: +$('#hsFg').value, force_sign: +$('#hsFs').value, force_deadband: +$('#hsFd').value,
+  friction_scale: +$('#hsFr').value, trigger_deg: [+$('#hsTo').value, +$('#hsTc').value], gripper_raw: [+$('#hsGo').value, +$('#hsGc').value] }, 'Applied (not saved yet)');
+// the arm's name: header, tab title, the This arm card (the network name is the one the arm booted with, from the hello)
+function renderName(st) {
+  const name = st.name || '', want = 'raft-' + (name || 'leader') + '.local';
+  $('#brandSub').textContent = name || 'leader arm';
+  $('#brand').title = name ? 'RAFT ' + name : 'RAFT leader arm';
+  document.title = name ? 'RAFT ' + name : 'RAFT leader';
+  if (name !== S.nameSeen) { S.nameSeen = name; if (!focused($('#armName'))) $('#armName').value = name; }
+  const now = S.hello && S.hello.sys && S.hello.sys.host;
+  $('#armHost').textContent = DEMO || (S.hello && S.hello.sim) || !now ? want + ' (on the arm)' : now === want ? now : now + ', ' + want + ' after a restart';
+}
+$('#nameSet').onclick = async () => {
+  const r = await cmd({ cmd: 'set_name', name: $('#armName').value.trim() });
+  if (r && r.ok) toast((r.name ? 'Named ' + r.name : 'Name removed') + '. Save, then restart for ' + r.host, 'ok');
+};
+$('#armName').onkeydown = (e) => { if (e.key === 'Enter') $('#nameSet').click(); };
+$('#arSet').onclick = () => cmd({ cmd: 'auto_rest', on: $('#arOn').checked, idle_s: +$('#arIdle').value });
+$('#arOn').onchange = () => cmd({ cmd: 'auto_rest', on: $('#arOn').checked });
+$('#maSet').onclick = () => cmd({ cmd: 'set_ma_per_unit', value: +$('#maUnit').value });
+$('#sLoad').onclick = () => cmd({ cmd: 'load' }, 'Saved settings reloaded');
+$('#sDefaults').onclick = async () => { if (await ask('Reset every setting, including the calibration, to factory defaults? Nothing is saved until you press Save.', 'Load defaults')) cmd({ cmd: 'defaults' }, 'Defaults loaded, not saved'); };
+function applyTheme(t) {
+  if (t === 'auto') document.documentElement.removeAttribute('data-theme'); else document.documentElement.setAttribute('data-theme', t);
+  store.set('theme', t);
+  for (const b of $$('#theme button')) b.classList.toggle('on', b.dataset.t === t);
+  readColors();
+}
+for (const b of $$('#theme button')) b.onclick = () => applyTheme(b.dataset.t);
+if (window.matchMedia) window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', readColors);
+$('#rate').value = String(S.rate);
+$('#rate').onchange = (e) => { S.rate = +e.target.value; store.set('rate', S.rate); applyRate(); };
+$('#helpAll').checked = !!store.get('helpAll', false);
+document.body.classList.toggle('allhelp', $('#helpAll').checked);
+$('#helpAll').onchange = (e) => { store.set('helpAll', e.target.checked); document.body.classList.toggle('allhelp', e.target.checked); };
+
+// ---------------------------------------------------------------- Health: control loop, servo bus, processor, network
+// The arm sends its figures in the binary health message once a second. The page measures the network itself: frame
+// spacing, how much later than the quickest frame each one arrives (from the frame's own timestamp), and a ping.
+const HL = { hist: [], seq: 0, missed: [], rtt: [],
+             net: { lastArr: 0, lastDev: 0, devMs: 0, offs: [], ivl: [], mins: [], delay: null, delayMax: null, ivlJit: null } };
+const PARTS = [['servo read', 's0'], ['lock wait', 's4'], ['controller', 's3'], ['servo writes', 's2']];
+const PART_KEYS = ['read_us', 'lock_us', 'app_us', 'write_us'];
+function netFrame(f) {
+  const N = HL.net, now = performance.now();
+  if (N.lastArr) {
+    const d = ((f.tUs - N.lastDev) >>> 0) / 1000;
+    if (d > 3000) { N.mins = []; N.offs = []; N.ivl = []; N.devMs = 0; }    // a long pause (hidden tab, reconnect): start over
+    else { N.devMs += d; N.ivl.push(now - N.lastArr); }
+  }
+  N.lastArr = now; N.lastDev = f.tUs;
+  N.offs.push(now - N.devMs);                         // arrival minus the frame's time: a constant plus its delay
+}
+function renderView() {
+  const now = performance.now(), N = HL.net;
+  const viewFps = S.drawT ? (S.draws || 0) * 1000 / (now - S.drawT) : 0;
+  S.draws = 0; S.drawT = now;
+  const rb = HL.rtt.length ? Math.min(...HL.rtt) : null;
+  const age = rb == null || N.delay == null || !S.fps ? null : rb / 2 + N.delay + 500 / S.fps;
+  $('#hView').textContent = 'View ' + viewFps.toFixed(0) + ' fps  ·  Data ' + S.fps.toFixed(0) + ' /s  ·  Age ' + (age == null ? '-' : '≈ ' + age.toFixed(0) + ' ms');
+}
+function healthTick() {
+  const N = HL.net;
+  if (N.offs.length) {
+    N.mins.push(Math.min(...N.offs));
+    if (N.mins.length > 10) N.mins.shift();
+    const base = Math.min(...N.mins), lags = N.offs.map((o) => o - base);
+    N.delay = lags.reduce((a, b) => a + b, 0) / lags.length;
+    N.delayMax = Math.max(...lags);
+  } else N.delay = N.delayMax = null;
+  if (N.ivl.length > 2) {
+    const m = N.ivl.reduce((a, b) => a + b, 0) / N.ivl.length;
+    N.ivlJit = Math.sqrt(N.ivl.reduce((a, b) => a + (b - m) * (b - m), 0) / N.ivl.length);
+  } else N.ivlJit = null;
+  N.offs = []; N.ivl = [];
+  if (!DEMO && ws && ws.readyState === 1 && !S.hidden) {
+    const t = performance.now();
+    send({ cmd: 'ping' }).then(() => { HL.rtt.push(performance.now() - t); if (HL.rtt.length > 30) HL.rtt.shift(); }).catch(() => {});
+  }
+  renderStatusBar();
+  if (page === 'health') { renderHealth(); healthBus(); }
+  renderView();
+}
+const loopTarget = (L) => (L && L.target_hz) || 250;
+function loopState(L) {
+  if (!L || !L.seq) return ['-', '', ''];
+  const periodUs = 1e6 / loopTarget(L);
+  if (L.hz < 0.95 * loopTarget(L)) return ['SLOW', 'bad', 'h'];
+  if (L.overruns[0] > 0) return ['LATE TICKS', 'warn', 'w'];
+  if (L.failed_reads[0] > 0) return ['BUS ERRORS', 'warn', 'w'];
+  if (L.work_us[1] > 0.9 * periodUs) return ['TIGHT', 'warn', 'w'];
+  return ['OK', 'ok', ''];
+}
+const ms = (us, n = 2) => us == null ? '-' : (us / 1000).toFixed(n);
+const usOrMs = (us) => us == null || !isFinite(us) ? '-' : us < 1000 ? us.toFixed(us < 10 ? 1 : 0) + ' µs' : (us / 1000).toFixed(2) + ' ms';
+function fmtDur(s) {
+  if (s == null) return '-';
+  const d = Math.floor(s / 86400), hh = Math.floor(s / 3600) % 24, m = Math.floor(s / 60) % 60;
+  return d ? d + ' d ' + hh + ' h' : hh ? hh + ' h ' + String(m).padStart(2, '0') + ' min' : m + ' min ' + String(Math.floor(s % 60)).padStart(2, '0') + ' s';
+}
+function busSummary() {
+  const r = missRates();
+  if (!r) return { text: '-', cls: '', bad: [] };
+  const bad = r.map((v, i) => [i, v]).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]);
+  return { text: bad.length ? bad.slice(0, 2).map(([i, v]) => 'J' + (i + 1) + ' ' + v.toFixed(v < 10 ? 1 : 0) + '/s').join(', ') : 'clean', cls: bad.length ? 'w' : '', bad };
+}
+function renderStatusBar() {
+  const hm = S.hm, L = hm && hm.loop, has = !!(L && L.seq);
+  const [, cls, vcls] = loopState(L);
+  $('#sbDot').className = 'dot' + (!has ? '' : cls === 'ok' ? ' live' : cls === 'warn' ? ' wait' : ' bad');
+  $('#sbHz').textContent = has ? L.hz.toFixed(1) : '-';
+  $('#sbHz').className = vcls;
+  $('#sbJit').textContent = has ? usOrMs(L.jitter_us) : '-';
+  $('#sbTick').textContent = has ? ms(L.work_us[0]) + ' ms (' + ms(L.work_us[1]) + ')' : '-';
+  $('#sbLate').textContent = has ? String(L.overruns[0]) : '-';
+  $('#sbLate').className = has && L.overruns[0] ? 'w' : '';
+  const cpu = hm && hm.cpu;
+  $('#sbCpu').textContent = cpu && cpu[0] >= 0 ? cpu.map((v) => v.toFixed(0)).join(' / ') : '-';
+  const bus = busSummary();
+  $('#sbBus').textContent = bus.text;
+  $('#sbBus').className = bus.cls;
+  $('#navHealth').hidden = !bus.bad.length;
+  $('#navHealth').textContent = bus.bad.map(([i]) => 'J' + (i + 1)).slice(0, 2).join(' ');
+  const rtt = HL.rtt.length ? HL.rtt[HL.rtt.length - 1] : null;
+  $('#sbRtt').textContent = rtt == null ? '-' : rtt.toFixed(1);
+  $('#sbHeap').textContent = hm && hm.heap ? (hm.heap.free / 1024).toFixed(1) : '-';
+  const net = hm && hm.net;
+  $('#sbNet').textContent = DEMO ? 'Demo: no arm connected' : !net ? '-' : net.link_mbps > 0 ? 'Ethernet ' + net.link_mbps + ' Mbit ' + (net.full_duplex ? 'full' : 'half') + ' duplex'
+    : S.hello && S.hello.sim ? 'Simulator on this PC' : net.up ? 'Network up' : 'Network down';
+}
+function renderHealth() {
+  const hm = S.hm || {}, L = hm.loop, cpu = hm.cpu, N = HL.net;
+  const rtt = HL.rtt.length ? HL.rtt[HL.rtt.length - 1] : null;
+  const [state, chipCls] = loopState(L);
+  $('#hlState').textContent = state;
+  $('#hlState').className = 'chip ' + chipCls;
+  const has = !!(L && L.seq), periodUs = 1e6 / loopTarget(L);
+  const tile = (k, cls) => { $('#hlT' + k).className = 'tile ' + (cls || ''); };
+  $('#hlHz').textContent = has ? L.hz.toFixed(1) : '-';
+  $('#hlHzU').textContent = 'Hz of ' + loopTarget(L).toFixed(0);
+  tile(0, has && L.hz < 0.95 * loopTarget(L) ? 'h' : '');
+  $('#hlPer').textContent = has ? ms(L.period_us[1], 3) : '-';
+  $('#hlPerU').textContent = has ? 'ms, ' + ms(L.period_us[0]) + ' to ' + ms(L.period_us[2]) : 'ms mean';
+  $('#hlJit').textContent = has ? usOrMs(L.jitter_us).split(' ')[0] : '-';
+  $('#hlJitU').textContent = has ? usOrMs(L.jitter_us).split(' ')[1] + ' rms' : 'rms';
+  $('#hlWork').textContent = has ? ms(L.work_us[0]) : '-';
+  $('#hlWorkU').textContent = has ? 'ms mean, ' + ms(L.work_us[1]) + ' max' : 'ms mean';
+  tile(3, has && L.work_us[1] > 0.9 * periodUs ? 'w' : '');
+  $('#hlOver').textContent = has ? String(L.overruns[0]) : '-';
+  $('#hlOverU').textContent = has ? 'last s · ' + L.overruns[1] + ' total' : 'last s';
+  tile(4, has && L.overruns[0] ? 'w' : '');
+  $('#hlFail').textContent = has ? String(L.failed_reads[0]) : '-';
+  $('#hlFailU').textContent = has ? 'last s · ' + L.failed_reads[1] + ' total' : 'last s';
+  tile(5, has && L.failed_reads[0] ? 'w' : '');
+  const bars = $$('#hlBud i');
+  PART_KEYS.forEach((k, j) => { bars[j].style.width = has ? clamp(L[k][0] / periodUs * 100, 0, 100) + '%' : '0'; bars[j].style.background = C[PARTS[j][1]]; });
+  $('#hlBudMax').hidden = !has;
+  if (has) $('#hlBudMax').style.left = 'calc(' + clamp(L.work_us[1] / periodUs * 100, 0, 100) + '% - 1px)';
+  const pms = periodUs / 1000;
+  if ($('#hlAxis').dataset.p !== String(pms)) {
+    $('#hlAxis').dataset.p = String(pms);
+    $('#hlAxis').innerHTML = '';
+    for (let k = 0; k <= pms; k++) $('#hlAxis').append(h('span', { style: 'left:' + (k / pms * 100) + '%' }, k + (k === Math.floor(pms) ? ' ms' : '')));
+  }
+  if (!$('#hlLeg').childElementCount) {
+    PARTS.forEach(([n, c]) => $('#hlLeg').append(h('span', null, h('i', { style: 'background:var(--' + c + ')' }), n)));
+    $('#hlLeg').append(h('span', null, h('i', { style: 'background:var(--text);width:2px;height:9px;vertical-align:0' }), 'longest tick'));
+  }
+  const mm = (a) => a ? ms(a[0]) + ' / ' + ms(a[1]) + ' ms' : '-';
+  kvFill($('#hlKv'), has ? [
+    ['Period min / mean / max', ms(L.period_us[0]) + ' / ' + ms(L.period_us[1]) + ' / ' + ms(L.period_us[2]) + ' ms'],
+    ['Work per tick, mean / max', mm(L.work_us)],
+    ['Servo read', mm(L.read_us)], ['Waiting for the lock', mm(L.lock_us)], ['Controller', mm(L.app_us)], ['Servo writes', mm(L.write_us)],
+    ['Failed bus reads', L.failed_reads[0] + ' last second, ' + L.failed_reads[1] + ' since start'],
+  ] : [['Loop figures', 'none yet (the first second)']]);
+  drawHealthChart();
+  // servo bus
+  const t = $('#hbTbl'), f = S.f, rates = missRates();
+  t.innerHTML = '';
+  t.append(h('tr', null, ['Joint', 'Missed /s', 'Since start', 'Temp', 'Supply'].map((x) => h('th', null, x))));
+  for (let i = 0; i < 7; i++) {
+    const last = hm.missed ? hm.missed[i] : null, rate = rates ? rates[i] : null;
+    t.append(h('tr', { class: rate > 0 ? 'w' : '' }, h('td', null, 'J' + (i + 1) + ' ' + NAMES[i]), h('td', null, rate == null ? '-' : rate.toFixed(rate && rate < 10 ? 1 : 0)),
+      h('td', null, last == null ? '-' : String(last)), h('td', null, f ? f.temp[i] + ' °C' : '-'), h('td', null, f && f.volt ? f.volt[i].toFixed(1) + ' V' : '-')));
+  }
+  // processor
+  for (let c = 0; c < 2; c++) {
+    const v = Array.isArray(cpu) && cpu[c] >= 0 ? cpu[c] : null;
+    $('#hmC' + c).style.width = v == null ? '0' : clamp(v, 0, 100) + '%';
+    $('#hmC' + c).className = v > 95 ? 'h' : v > 85 ? 'w' : '';
+    $('#hmC' + c + 'v').textContent = v == null ? '-' : v.toFixed(0) + ' %';
+  }
+  const hp = hm.heap, sk = hm.stack, kb = (b) => (b / 1024).toFixed(1) + ' kB', sys = (S.hello && S.hello.sys) || {};
+  kvFill($('#hmKv'), [
+    ['Firmware', S.hello ? S.hello.fw : '-'],
+    ['Up for', fmtDur(hm.uptime_s)], ['Last reset', sys.reset || '-'], ['Clock', sys.cpu_mhz ? sys.cpu_mhz + ' MHz' : '-'],
+    ['Free memory', hp ? kb(hp.free) + ' of ' + kb(hp.size) : '-'], ['Lowest since start', hp ? kb(hp.min) : '-'],
+    ['Stack left', sk ? 'control ' + sk.control + ' B, network ' + sk.network + ' B, loop ' + sk.loop + ' B' : '-'],
+    ['Model check', S.modelErr == null ? '-' : S.modelErr.toFixed(3) + ' mm, page vs. arm'],
+  ]);
+  // network
+  const net = hm.net || {}, rb = HL.rtt.length ? Math.min(...HL.rtt) : null, rw = HL.rtt.length ? Math.max(...HL.rtt) : null;
+  kvFill($('#hnKv'), [
+    ['Live frames', S.fps.toFixed(1) + ' /s of ' + liveRate() + ' asked'],
+    ['Live data delay', N.delay == null || rb == null ? '-' : '≈ ' + (rb / 2 + N.delay).toFixed(1) + ' ms, worst ' + (rb / 2 + N.delayMax).toFixed(1) + ' ms'],
+    ['Frame spacing jitter', N.ivlJit == null ? '-' : N.ivlJit.toFixed(1) + ' ms rms'],
+    ['Round trip (ping)', rtt == null ? '-' : rtt.toFixed(1) + ' ms, best ' + rb.toFixed(1) + ', worst ' + rw.toFixed(1) + ' (30 s)'],
+    ['Link', net.link_mbps > 0 ? net.link_mbps + ' Mbit/s ' + (net.full_duplex ? 'full' : 'half') + ' duplex' : '-'],
+    ['Address', sys.ip || location.host || '-'],
+    ['Clients', net.web_clients == null ? '-' : net.web_clients + ' web' + (net.tcp_clients == null ? '' : ', ' + net.tcp_clients + ' TCP')],
+    ['Frames sent', net.web_frames == null ? '-' : net.web_frames + ' web' + (net.udp_frames == null ? '' : ', ' + net.udp_frames + ' UDP stream')],
+  ]);
+}
+function drawHealthChart() {
+  const fc = fitCanvas($('#hlChart'));
+  if (!fc) return;
+  const { g, w, hh } = fc, n = 120, data = HL.hist;
+  let hi = 6;
+  for (const row of data) for (const v of row) if (v > hi) hi = v;
+  hi = Math.ceil(hi * 1.1);
+  const X = (k) => 34 + (w - 40) * (k + n - data.length) / (n - 1), Y = (v) => 6 + (hh - 14) * (1 - v / hi);
+  g.font = '10px ui-monospace,Consolas,monospace'; g.fillStyle = C.faint; g.strokeStyle = C.grid2; g.lineWidth = 1;
+  for (let k = 0; k <= 3; k++) {
+    const v = hi * k / 3, y = Y(v);
+    g.globalAlpha = 0.5; g.beginPath(); g.moveTo(34, y); g.lineTo(w - 4, y); g.stroke(); g.globalAlpha = 1;
+    g.fillText(v.toFixed(hi < 10 ? 1 : 0), 2, y + 3);
+  }
+  g.textAlign = 'right'; g.fillText('ms', w - 6, 12); g.textAlign = 'left';
+  const pm = HL.periodMs || 4;
+  g.strokeStyle = C.faint; g.setLineDash([4, 4]); g.beginPath(); g.moveTo(34, Y(pm)); g.lineTo(w - 4, Y(pm)); g.stroke(); g.setLineDash([]);
+  [C.s0, C.s1].forEach((col, sI) => {
+    if (data.length < 2) return;
+    g.strokeStyle = col; g.lineWidth = 1.6; g.beginPath();
+    data.forEach((row, k) => { if (k) g.lineTo(X(k), Y(row[sI])); else g.moveTo(X(k), Y(row[sI])); });
+    g.stroke();
+  });
+}
+// the bus diagnosis: its own command, polled while Health is open (servo_bus.h)
+async function healthBus() {
+  if (page !== 'health' || DEMO || S.busBusy) return;
+  let d;
+  S.busBusy = true;
+  try { d = await send({ cmd: 'bus_diag' }); } catch (e) { return; } finally { S.busBusy = false; }
+  if (!d || !d.ok) { $('#bdState').textContent = 'not on this firmware'; return; }
+  HL.bus = d;
+  if (!focused($('#bdRetry'))) $('#bdRetry').checked = !!d.retry;
+  $('#bdFull').textContent = d.full_read ? 'Every tick: position, speed, voltage, temperature and current of every servo (registers 56..70).' : 'Every tick: position and speed (registers 56..59).';
+  $('#bdPollRow').hidden = !!d.full_read;
+  if (!focused($('#bdPoll')) && d.servo_poll_ms) {
+    const opt = [...$('#bdPoll').options].find((o) => Math.abs(+o.value - d.servo_poll_ms) < 30);
+    if (opt) $('#bdPoll').value = opt.value;
+  }
+  const bad = d.servos.filter((x) => x.missed > 0);
+  $('#bdState').textContent = d.trace_left ? 'tracing ' + (d.trace_left / 250).toFixed(0) + ' s' : bad.length ? bad.map((x) => 'J' + x.j).join(' ') + ' missing' : 'clean';
+  $('#bdState').className = 'chip ' + (d.trace_left ? 'nav' : bad.length ? 'warn' : 'ok');
+  const t = $('#bdTbl');
+  t.innerHTML = '';
+  t.append(h('tr', null, ['Joint', 'Missed', 'Silent', 'Garbled', 'Gaps', 'Longest', 'Flags', 'Retry'].map((x) => h('th', null, x))));
+  const pct = (a, b) => b ? Math.round(100 * a / b) + ' %' : '-';
+  for (const x of d.servos) {
+    t.append(h('tr', { class: x.missed ? 'w' : '' }, h('td', null, 'J' + x.j + ' (ID ' + x.id + ')'), h('td', null, String(x.missed)),
+      h('td', null, pct(x.silent, x.missed)), h('td', null, pct(x.garbled, x.missed)), h('td', null, x.runs.join(' / ')),
+      h('td', null, x.longest ? x.longest + ' (' + (x.longest * 4) + ' ms)' : '-'), h('td', null, x.flagged ? x.flagged + ' (0x' + x.flags.toString(16) + ')' : '-'),
+      h('td', null, x.retried ? x.recovered + ' / ' + x.retried : '-')));
+  }
+}
+$('#bdRetry').onchange = (e) => cmd({ cmd: 'bus_retry', on: e.target.checked });
+$('#bdPoll').onchange = (e) => cmd({ cmd: 'servo_poll', ms: +e.target.value });
+$('#bdTrace').onclick = () => cmd({ cmd: 'bus_diag', trace: 5000 }, 'Tracing the bus for 20 s');
+$('#bdRaw').onclick = async () => {
+  const lines = [];
+  for (let k = 0; k <= 4; k++) {
+    const c = await cmd({ cmd: 'bus_diag', capture: k });
+    if (!c || !c.ok) continue;
+    lines.push((k === 4 ? 'clean read ' : 'read ') + c.read + (c.missing.length ? ', missing J' + c.missing.join(' J') : '') + ', ' + c.len + ' bytes' +
+      (c.trace.length ? '\n  in at us after the request: ' + c.trace.map(([us, n]) => us + ':' + n).join(' ') : '') + '\n  ' + c.hex.replace(/(ffff)/g, ' $1').trim());
+  }
+  $('#bdOut').hidden = false;
+  $('#bdOut').textContent = lines.length ? lines.join('\n') : 'No reads recorded yet.';
+};
+$('#sbar').onclick = () => showPage('health');
+
+// ---------------------------------------------------------------- Plots: the 250 Hz capture (scope_start / scope_read on the arm)
+const SC = { data: null };
+const sleep = (t) => new Promise((r) => setTimeout(r, t));
+// the firmware's target filter (teleop.cpp TeleopSession::setFilter): 2nd-order Butterworth, bilinear with prewarping,
+// started at the first sample
+function lp2(x, hz, fs) {
+  if (!(hz > 0) || !x.length) return null;
+  hz = Math.min(hz, 0.45 * fs);
+  const k = Math.tan(Math.PI * hz / fs), r2 = Math.SQRT2, nrm = 1 / (1 + r2 * k + k * k);
+  const b0 = k * k * nrm, b1 = 2 * b0, b2 = b0, a1 = 2 * (k * k - 1) * nrm, a2 = (1 - r2 * k + k * k) * nrm;
+  const y = new Array(x.length);
+  let x1 = x[0], x2 = x[0], y1 = x[0], y2 = x[0];
+  for (let i = 0; i < x.length; i++) { const v = b0 * x[i] + b1 * x1 + b2 * x2 - a1 * y1 - a2 * y2; x2 = x1; x1 = x[i]; y2 = y1; y1 = v; y[i] = v; }
+  return y;
+}
+// how far the filtered curve trails the raw one (the shift with the least squared error, refined between samples) and
+// how much it removes once shifted back
+function lagOf(raw, f, fs) {
+  let best = 0;
+  const err = [];
+  for (let s = 0; s <= 40; s++) {
+    let e = 0, n = 0;
+    for (let i = 0; i + s < raw.length; i++) { const d = f[i + s] - raw[i]; e += d * d; n++; }
+    err.push(e / Math.max(1, n));
+    if (err[s] < err[best]) best = s;
+  }
+  let frac = 0;
+  if (best > 0 && best < 40) { const a = err[best - 1], b = err[best], c = err[best + 1]; const den = a - 2 * b + c; if (den > 0) frac = 0.5 * (a - c) / den; }
+  return { ms: (best + frac) * 1000 / fs, rms: Math.sqrt(err[best]) };
+}
+async function scopeCapture() {
+  const secs = 2;
+  const r = await cmd({ cmd: 'scope_start', seconds: secs });
+  if (!r || !r.ok) return;
+  $('#scGo').disabled = true;
+  $('#scState').textContent = 'recording';
+  $('#scState').className = 'chip warn';
+  try {
+    let st = null;
+    await sleep(secs * 1000);
+    for (let k = 0; k < 40; k++) { st = await send({ cmd: 'scope_read', from: 0, n: 0 }); if (st.state === 'done') break; await sleep(100); }
+    if (!st || st.state !== 'done') throw new Error('the capture did not finish');
+    const Wd = st.words, total = st.have, words = new Int16Array(total * Wd);
+    $('#scState').textContent = 'loading';
+    for (let from = 0; from < total; from += 45) {
+      const c = await send({ cmd: 'scope_read', from, n: 45 });
+      const bin = atob(c.b64), dv = new DataView(new ArrayBuffer(bin.length));
+      for (let i = 0; i < bin.length; i++) dv.setUint8(i, bin.charCodeAt(i));
+      for (let i = 0; i < bin.length / 2; i++) words[from * Wd + i] = dv.getInt16(2 * i, true);
+    }
+    send({ cmd: 'scope_free' }).catch(() => {});
+    const d = { hz: st.hz, n: total, t: [], q: [[], [], [], [], [], [], []], qd: [[], [], [], [], [], [], []], sent: [[], [], [], [], [], []], hasSent: false,
+                cur: [[], [], [], [], [], [], []], trq: [[], [], [], [], [], [], []] };
+    for (let k = 0; k < total; k++) {
+      const o = k * Wd;
+      d.t.push((words[o] & 0xffff) / 10);
+      for (let i = 0; i < 7; i++) { d.q[i].push(words[o + 1 + i] * 1e-4 * R2D); d.qd[i].push(words[o + 8 + i] * 1e-3 * R2D); }
+      for (let i = 0; i < 6; i++) { const v = words[o + 15 + i]; d.sent[i].push(v === -32768 ? NaN : v * 1e-4 * R2D); if (v !== -32768) d.hasSent = true; }
+      if (Wd >= 28) for (let i = 0; i < 7; i++) { d.cur[i].push(words[o + 21 + i]); d.trq[i].push(words[o + 21 + i] * ktOf(i)); }
+    }
+    SC.data = d;
+    $('#scState').textContent = total + ' samples at ' + d.hz + ' Hz';
+    $('#scState').className = 'chip ok';
+    drawScope();
+  } catch (e) {
+    toast(e.message, 'bad');
+    $('#scState').textContent = 'failed';
+    $('#scState').className = 'chip';
+  } finally { $('#scGo').disabled = false; }
+}
+function drawScope() {
+  const fc = fitCanvas($('#scChart'));
+  if (!fc) return;
+  const { g, w, hh } = fc;
+  const d = SC.data, leg = $('#scLeg'), kv = $('#scKv');
+  leg.innerHTML = ''; kv.innerHTML = '';
+  if (!d) { g.fillStyle = C.faint; g.font = '13px system-ui,sans-serif'; g.fillText('Press Capture 2 s and move the arm.', 40, hh / 2); return; }
+  const j = +$('#scJ').value, sig = $('#scSig').value, raw = d[sig][j];
+  const unit = { q: 'deg', qd: 'deg/s', cur: 'mA', trq: 'mNm' }[sig];
+  if (!raw.length) { g.fillStyle = C.faint; g.font = '13px system-ui,sans-serif'; g.fillText('This firmware does not record ' + unit + '.', 40, hh / 2); return; }
+  const fA = +$('#scA').value, fB = +$('#scB').value;
+  const lines = [{ v: raw, c: C.muted, w: 1.2, name: 'raw (250 Hz)' }];
+  const A = lp2(raw, fA, d.hz), Bf = lp2(raw, fB, d.hz);
+  if (A) lines.push({ v: A, c: C.s0, w: 1.8, name: 'filter A ' + fA + ' Hz' });
+  if (Bf) lines.push({ v: Bf, c: C.s1, w: 1.8, name: 'filter B ' + fB + ' Hz' });
+  if (sig === 'q' && j < 6 && d.hasSent) lines.push({ v: d.sent[j], c: C.s2, w: 1.4, name: 'sent to PAR6' });
+  // the window
+  const winS = +$('#scWin').value, span = Math.min(d.n, Math.round(winS * d.hz));
+  const k0 = Math.round((+$('#scPos').value) * (d.n - span)), k1 = k0 + span;
+  let lo = Infinity, hi = -Infinity;
+  for (const L of lines) for (let k = k0; k < k1; k++) { const v = L.v[k]; if (isFinite(v)) { if (v < lo) lo = v; if (v > hi) hi = v; } }
+  if (!isFinite(lo)) return;
+  const minSpan = { q: 0.5, qd: 5, cur: 20, trq: 10 }[sig];
+  if (hi - lo < minSpan) { const m = (hi + lo) / 2; lo = m - minSpan / 2; hi = m + minSpan / 2; }
+  const padv = (hi - lo) * 0.08; lo -= padv; hi += padv;
+  const X = (k) => 40 + (w - 46) * (k - k0) / Math.max(1, span - 1), Y = (v) => 6 + (hh - 20) * (1 - (v - lo) / (hi - lo));
+  g.font = '10px ui-monospace,Consolas,monospace'; g.fillStyle = C.faint; g.strokeStyle = C.grid2; g.lineWidth = 1;
+  for (let k = 0; k <= 4; k++) {
+    const v = lo + (hi - lo) * k / 4, y = Y(v);
+    g.globalAlpha = 0.5; g.beginPath(); g.moveTo(40, y); g.lineTo(w - 4, y); g.stroke(); g.globalAlpha = 1;
+    g.fillText(Math.abs(hi - lo) < 5 ? v.toFixed(2) : v.toFixed(0), 2, y + 3);
+  }
+  g.textAlign = 'right'; g.fillText(unit, w - 6, 12);
+  g.fillText((d.t[k1 - 1] - d.t[k0]).toFixed(0) + ' ms', w - 6, hh - 3); g.textAlign = 'left';
+  for (const L of lines) {
+    g.strokeStyle = L.c; g.lineWidth = L.w; g.beginPath();
+    let pen = false;
+    for (let k = k0; k < k1; k++) { const v = L.v[k]; if (!isFinite(v)) { pen = false; continue; } const x = X(k), y = Y(v); if (pen) g.lineTo(x, y); else g.moveTo(x, y); pen = true; }
+    g.stroke();
+    leg.append(h('span', null, h('i', { style: 'background:' + L.c }), L.name));
+  }
+  const row = (k, v) => { kv.append(h('dt', null, k)); kv.append(h('dd', { class: 'num' }, v)); };
+  let dtMax = 0;
+  for (let k = 1; k < d.n; k++) dtMax = Math.max(dtMax, d.t[k] - d.t[k - 1]);
+  row('Capture', d.n + ' ticks, ' + (d.t[d.n - 1] - d.t[0]).toFixed(0) + ' ms, longest gap ' + dtMax.toFixed(1) + ' ms');
+  for (const [name, f, hz] of [['A', A, fA], ['B', Bf, fB]]) {
+    if (!f) continue;
+    const L = lagOf(raw, f, d.hz);
+    row('Filter ' + name + ' (' + hz + ' Hz)', 'lags ' + L.ms.toFixed(1) + ' ms, differs ' + L.rms.toFixed(sig === 'q' ? 3 : 1) + ' ' + unit + ' rms once shifted back');
+  }
+}
+$('#scGo').onclick = scopeCapture;
+for (const id of ['#scJ', '#scSig', '#scA', '#scB', '#scWin']) $(id).onchange = drawScope;
+$('#scPos').oninput = drawScope;
+
+// ---------------------------------------------------------------- console, log, toasts
+const logEl = $('#log');
+function logLine(cls, text) {
+  const t = new Date();
+  const ts = String(t.getHours()).padStart(2, '0') + ':' + String(t.getMinutes()).padStart(2, '0') + ':' + String(t.getSeconds()).padStart(2, '0');
+  const stick = logEl.scrollTop + logEl.clientHeight >= logEl.scrollHeight - 8;
+  logEl.append(h('div', { class: cls || '' }, h('time', null, ts), text));
+  while (logEl.childElementCount > 400) logEl.firstChild.remove();
+  if (stick) logEl.scrollTop = logEl.scrollHeight;
+}
+function toast(text, kind) {
+  const el = h('div', { class: 'toast ' + (kind || '') }, text);
+  $('#toasts').append(el);
+  while ($('#toasts').childElementCount > 4) $('#toasts').firstChild.remove();
+  setTimeout(() => el.remove(), kind === 'bad' ? 7000 : 4000);
+}
+// "status", "mode gravity", "calib_stop 3", "teleop_start pi.local", or JSON
+function parseLine(s) {
+  s = s.trim();
+  if (!s) return null;
+  if (s[0] === '{') return JSON.parse(s);
+  const parts = s.split(/\s+/), c = parts[0], a = parts.slice(1).join(' ');
+  const o = { cmd: c };
+  if (!a) return o;
+  if (/^-?[\d.]+$/.test(a)) o[c === 'calib_stop' || c === 'calib_torque' || c === 'servo_info' ? 'joint' : 'value'] = +a;
+  else o[c === 'mode' ? 'mode' : c === 'spring' ? 'type' : 'host'] = a;
+  return o;
+}
+const conHist = store.get('conHist', []);
+let conPos = conHist.length;
+function runLine(s) {
+  let o;
+  try { o = parseLine(s); } catch (e) { toast('not valid JSON: ' + e.message, 'bad'); return false; }
+  if (!o) return false;
+  conHist.push(s); if (conHist.length > 50) conHist.shift(); store.set('conHist', conHist); conPos = conHist.length;
+  cmd(o);
+  return true;
+}
+function conSend() { const el = $('#conIn'); if (runLine(el.value)) el.value = ''; }
+$('#conSend').onclick = conSend;
+$('#conIn').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') conSend();
+  else if (e.key === 'ArrowUp' && conPos > 0) { conPos--; e.target.value = conHist[conPos]; e.preventDefault(); }
+  else if (e.key === 'ArrowDown') { conPos = Math.min(conHist.length, conPos + 1); e.target.value = conHist[conPos] || ''; e.preventDefault(); }
+});
+
+// ---------------------------------------------------------------- search: pages, settings and commands (Ctrl K)
+function actions() {
+  const A = [];
+  for (const p in PAGES) A.push({ t: 'Go to ' + PAGES[p].t, sub: 'page', run: () => showPage(p) });
+  const click = (id) => () => { const e = $(id); if (e && !e.disabled) e.click(); };
+  A.push({ t: 'Open the console', sub: 'panel', run: () => showPage('con') },
+    { t: 'Show the joints', sub: 'panel', run: () => showDock('joints', true) }, { t: 'Show the live plot', sub: 'panel', run: () => showDock('plot', true) },
+    { t: 'Mode: Limp', sub: 'Esc', run: limp }, { t: 'Mode: Gravity', sub: 'mode', run: () => cmd({ cmd: 'mode', mode: 'gravity' }) },
+    { t: 'Mode: Hold', sub: 'mode', run: () => cmd({ cmd: 'mode', mode: 'move' }) },
+    { t: 'Save the settings to flash', sub: 'command', run: save }, { t: 'Reload the saved settings', sub: 'command', run: click('#sLoad') },
+    { t: 'Move to the standby pose', sub: 'Drive', run: click('#mvZero') }, { t: 'Move to the rest pose', sub: 'Drive', run: click('#mvRest') },
+    { t: 'Teleop: start', sub: 'Teleop', run: click('#tStart') }, { t: 'Teleop: stop', sub: 'Teleop', run: click('#tStop') },
+    { t: 'Teleop: hold or release PAR6', sub: 'Teleop', run: click('#tHold') }, { t: 'Teleop: realign', sub: 'Teleop', run: click('#tRealign') },
+    { t: 'Teleop: resume after a lost link', sub: 'Teleop', run: () => cmd({ cmd: 'teleop_resume' }) },
+    { t: 'Capture 2 s at 250 Hz', sub: 'Plots', run: () => { showPage('plots'); scopeCapture(); } },
+    { t: 'Trace the servo bus for 20 s', sub: 'Health', run: () => { showPage('health'); $('#bdTrace').click(); } },
+    { t: 'Read the servo settings', sub: 'Servos', run: () => { showPage('servos'); $('#svRead').click(); } },
+    { t: 'Clear the fault', sub: 'command', run: click('#faultClear') },
+    { t: 'Name this arm', sub: 'Settings', run: () => { showPage('set'); $('#armName').focus(); } },
+    { t: 'Theme: light', sub: 'display', run: () => applyTheme('light') }, { t: 'Theme: dark', sub: 'display', run: () => applyTheme('dark') },
+    { t: 'Theme: follow the system', sub: 'display', run: () => applyTheme('auto') },
+    { t: 'Show or hide the bottom panel', sub: 'panel', run: () => showDock(null, !dockOpen) });
+  for (const c of $$('.page .card')) {
+    const p = c.closest('.page').id.slice(2), tt = c.querySelector('h3 > span');
+    if (!tt || !PAGES[p]) continue;
+    A.push({ t: PAGES[p].t + ' › ' + tt.textContent.trim(), sub: 'setting', kw: c.textContent.toLowerCase(), run: () => {
+      showPage(p);
+      c.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      c.classList.remove('flash'); void c.offsetWidth; c.classList.add('flash');
+      c.addEventListener('animationend', () => c.classList.remove('flash'), { once: true });
+    } });
+  }
+  return A;
+}
+const PAL = { all: [], list: [], sel: 0 };
+function palRender() {
+  const q = $('#palIn').value.trim(), qs = q.toLowerCase().split(/\s+/).filter(Boolean);
+  let list = PAL.all.map((a, i) => {
+    const t = a.t.toLowerCase();
+    const score = !qs.length ? 1 : qs.every((w) => t.includes(w)) ? 3 - (t.startsWith(qs[0]) ? 0 : 1) : a.kw && qs.every((w) => a.kw.includes(w) || t.includes(w)) ? 1 : 0;
+    return { a, i, score };
+  }).filter((x) => x.score > 0).sort((x, y) => y.score - x.score || x.i - y.i).slice(0, 40).map((x) => x.a);
+  if (q && /^(\{|[a-z][a-z_0-9]*(\s|$))/.test(q)) {
+    const run = { t: 'Run on the arm: ', code: q, sub: 'command', run: () => { runLine(q); showDock('con', true); } };
+    if (q[0] === '{' || !list.length) list.unshift(run); else list.push(run);
+  }
+  PAL.list = list;
+  PAL.sel = clamp(PAL.sel, 0, Math.max(0, list.length - 1));
+  const ul = $('#palList');
+  ul.innerHTML = '';
+  list.forEach((a, k) => ul.append(h('li', { class: k === PAL.sel ? 'on' : '', onclick: () => palRun(k), onmousemove: () => { if (PAL.sel !== k) { PAL.sel = k; palMark(); } } },
+    h('span', null, a.t, a.code ? h('code', null, a.code) : null), h('small', null, a.sub || ''))));
+  if (!list.length) ul.append(h('li', { class: 'muted' }, 'Nothing found'));
+}
+function palMark() { $$('#palList li').forEach((li, k) => li.classList.toggle('on', k === PAL.sel)); const on = $('#palList li.on'); if (on) on.scrollIntoView({ block: 'nearest' }); }
+function palRun(k) { const a = PAL.list[k]; closePal(); if (a) a.run(); }
+function openPal() {
+  if (!$('#pal').hidden) return;
+  PAL.all = actions(); PAL.sel = 0;
+  $('#palIn').value = '';
+  $('#pal').hidden = false;
+  palRender();
+  $('#palIn').focus();
+}
+function closePal() { $('#pal').hidden = true; }
+$('#openK').onclick = openPal;
+$('#palIn').addEventListener('input', () => { PAL.sel = 0; palRender(); });
+$('#palIn').addEventListener('keydown', (e) => {
+  if (e.key === 'ArrowDown') { PAL.sel = Math.min(PAL.list.length - 1, PAL.sel + 1); palMark(); e.preventDefault(); }
+  else if (e.key === 'ArrowUp') { PAL.sel = Math.max(0, PAL.sel - 1); palMark(); e.preventDefault(); }
+  else if (e.key === 'Enter') { palRun(PAL.sel); e.preventDefault(); }
+});
+$('#pal').addEventListener('click', (e) => { if (e.target.id === 'pal') closePal(); });
+// Esc: LIMP, from anywhere; with a box open it closes the box first (a second press goes limp), so dismissing a
+// dialog never drops the arm
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    e.preventDefault();
+    if (!$('#pal').hidden) { closePal(); return; }
+    if (askDone) { askDone(false); return; }
+    limp();
+    if (document.activeElement) document.activeElement.blur();
+    return;
+  }
+  if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K')) { e.preventDefault(); openPal(); return; }
+  if (e.key === '/' && !isTyping(e.target) && $('#pal').hidden) { e.preventDefault(); openPal(); }
+});
+
+// ---------------------------------------------------------------- simulator hand
+for (const b of $$('[data-hand]')) b.onclick = () => cmd({ cmd: 'sim_hand', mode: b.dataset.hand });
+$('#grabMode').onchange = (e) => { S.grabMode = e.target.checked; };
+
+// ---------------------------------------------------------------- the tool point readout, degrees or radians
+function setUnits(u) {
+  S.units = u; store.set('units', u);
+  for (const b of $$('#units button')) b.classList.toggle('on', b.dataset.u === u);
+  for (const e of $$('#pose .aU')) e.textContent = u;
+  const th = $('#jAh');
+  if (th) th.textContent = u === 'rad' ? 'rad' : '°';
+  if (S.f) { renderPose(S.f); renderJoints(S.f); }
+}
+for (const b of $$('#units button')) b.onclick = () => setUnits(b.dataset.u);
+function renderPose(f) {
+  for (let k = 0; k < 3; k++) { $('#pp' + k).textContent = fix(f.tcp[k] * 1000, 1); $('#pp' + (k + 3)).textContent = ang(f.tcp[k + 3]); }
+}
+
+// ---------------------------------------------------------------- 10 Hz page update (the canvas redraws on its own)
+function uiTick() {
+  const now = performance.now();
+  if (now - S.fpsT >= 1000) { S.fps = S.fCount * 1000 / (now - S.fpsT); S.fCount = 0; S.fpsT = now; }
+  const f = S.f;
+  if (!f || !S.fNew) return;
+  S.fNew = false;
+  renderMode(MODES[f.mode] || '?');
+  $('#cDerate').hidden = !(f.flags & 128);
+  if (onStage()) {
+    renderPose(f);
+    if (dockOpen && dockTab === 'joints') renderJoints(f);
+    if (dockOpen && dockTab === 'plot') drawChart();
+  }
+  if (page === 'tele') renderTeleLive(f);
+  if (page === 'servos') renderServoTest(S.st, f);
+  if (S.hello) {
+    const T = fk(f.q);
+    S.modelErr = Math.hypot(T[6].p[0] - f.tcp[0], T[6].p[1] - f.tcp[1], T[6].p[2] - f.tcp[2]) * 1000;
+  }
+}
+
+// ---------------------------------------------------------------- demo mode: a page opened from disk animates a fake arm
+const demo = {
+  mode: 0, t0: performance.now(), q: [0, 0, 0, 0, 0, 0, 0], goal: null, seq: 0, ev: 0, hseq: 0,
+  start() {
+    onHello(DEFAULT_HELLO); setConn('demo');
+    setInterval(() => this.tick(), 50);
+    setInterval(() => onStatus(this.status()), 500);
+    setInterval(() => this.health(), 1000);
+    onStatus(this.status());
+  },
+  tick() {
+    const t = (performance.now() - this.t0) / 1000;
+    if (this.goal) {
+      let done = true;
+      for (let i = 0; i < 7; i++) { const d = this.goal[i] - this.q[i]; if (Math.abs(d) > 0.002) done = false; this.q[i] += clamp(d, -0.03, 0.03); }
+      if (done) { this.goal = null; this.ev |= 1; }
+    } else if (this.mode === 1) {
+      this.q[0] = 0.35 * Math.sin(t * 0.4); this.q[1] = 0.3 + 0.25 * Math.sin(t * 0.3); this.q[2] = 0.35 + 0.3 * Math.sin(t * 0.37 + 1);
+      this.q[4] = 0.4 * Math.sin(t * 0.5); this.q[6] = 0.3 * Math.sin(t * 0.8) + 0.3;
+    }
+    const T = fk(this.q), R = T[6].R;
+    const pitch = Math.asin(clamp(R[2], -1, 1)), roll = Math.atan2(-R[5], R[8]), yaw = Math.atan2(-R[1], R[0]);
+    const g2 = -0.2269 * Math.sin(this.q[1]) - 0.16 * Math.cos(this.q[1] - this.q[2]), g3 = 0.16 * Math.cos(this.q[1] - this.q[2]);
+    const on = this.mode !== 0;
+    const f = { mode: this.mode, flags: 1 | (on ? 2 : 0) | 32, seq: ++this.seq, tUs: Math.round(t * 1e6), q: this.q.slice(), qd: [0, 0, 0, 0, 0, 0, 0],
+                tau: [0, on ? g2 : 0, on ? g3 : 0, 0, 0, 0, 0], grav: [0, g2, g3, 0, 0, 0, 0], tcp: [T[6].p[0], T[6].p[1], T[6].p[2], roll, pitch, yaw],
+                temp: [31, 44 + Math.round(4 * Math.sin(t / 9)), 41, 33, 32, 31, 30], events: this.ev,
+                volt: [6, 6, 5.9, 6, 6, 6, 6], stage: 0, tf: 0, locks: 0, qF: [0, 0, 0, 0, 0, 0, 0], tgtF: [0, 0, 0, 0, 0, 0], text: [0, 0, 0, 0, 0, 0],
+                grip: -1, prec: 1, guide: 0, pc: 0, off: 0 };
+    f.cur = f.tau.map((v, i) => Math.round(v / 0.441 * 1000 * (i === 1 ? 0.96 : 1)));   // "measured": J2 a little under the command
+    this.ev = 0;
+    onFrame(f);
+  },
+  health() {
+    const s = ++this.hseq, j = (k) => 0.6 + 0.4 * Math.sin(s / k);
+    const loop = { seq: s, ticks: 250, target_hz: 250, hz: 250, period_us: [3996, 4000, 4003], jitter_us: 1.1 * j(3), work_us: [920 * j(5), 1480], read_us: [610, 900],
+                   lock_us: [12, 410], app_us: [240 * j(4), 520], write_us: [60, 90], overruns: [0, 0], failed_reads: [0, 0] };
+    this.missed = (this.missed || [0, 0, 0, 0, 0, 0, 0]).map((v, i) => v + (i === 5 && s % 3 === 0 ? 2 : 0));
+    onHealth({ loop, cpu: [31, 25], uptime_s: s, heap: { free: 156160, min: 152474, size: 268000 }, stack: { control: 2900, network: 4100, loop: 5200 },
+               net: { up: true, full_duplex: true, link_mbps: 100, web_clients: 1, tcp_clients: 0, web_frames: this.seq, udp_frames: 0 }, missed: this.missed, stale: [0, 0] });
+  },
+  status() {
+    return { ok: true, name: '', mode: MODES[this.mode], fault: '', model_ok: true, calibrated: true, cal_flags: [3, 7, 7, 3, 3, 3, 3],
+             spring: { type: 1, k: 824, a_mm: 13, b_mm: 20, scale: 1.098 }, kt: [0.441, 0.397, 0.486, 0.441, 0.441, 0.441, 0.441],
+             gravity_scale: 1, hold_friction: 0.3, hold_stiffness: 1, hold_position: true, pos_mask: 0, joint_gravity: [1, 1, 1, 1, 1, 1, 1],
+             joint_damping: [0, 0, 0, 0, 0.03, 0.02, 0.035], auto_rest: false, idle_s: 10, ma_per_unit: 3.25, pi_host: '', stream: ':5005', unsaved: false,
+             calib: 'idle', calib_joint: 0, last_calib: '', last_calib_ok: true, calib_seq: 0, teleop: 'OFF', link: 'IDLE', link_error: '',
+             range_deg: DEFAULT_HELLO.lim_deg, stop_deg: [-136.28, -83.96, 92.81, -158.56, 119.72, 149.37, 39.63], friction_nm: [0, 0.021, 0.019, 0, 0, 0, 0],
+             precision: 1, locks: 0, guide: 'none', link_rate_hz: 50, teleop_filter_hz: 0, servo_test: null,
+             settings: { auto_reclaim: false, require_enable: false, passivity: true, barriers_always: false, force_gain: 0, force_sign: -1, force_deadband: 0.3,
+                         friction_scale: 0, trigger_deg: [0, 60], gripper_raw: [0, 255] },
+             buttons: { enable: false, clutch: false }, replay: { n: 0, dt_ms: 20, state: 'idle', t: 0, len_s: 0, speed: 1, note: '' } };
+  },
+  command(o) {
+    if (o.cmd === 'mode') { this.mode = Math.max(0, MODES.indexOf(o.mode)); this.goal = null; return { ok: true, mode: o.mode }; }
+    if (o.cmd === 'move') { this.mode = 2; this.goal = o.q_deg.concat([0]).slice(0, 7).map((d) => d * D2R); return { ok: true, mode: 'move' }; }
+    if (o.cmd === 'rest') { this.mode = 2; this.goal = DEFAULT_HELLO.rest_deg.map((d) => d * D2R); return { ok: true, mode: 'move' }; }
+    if (o.cmd === 'ws_rate' || o.cmd === 'ping') return { ok: true };
+    return { ok: false, error: 'demo mode: "' + o.cmd + '" needs the arm' };
+  },
+};
+
+// ---------------------------------------------------------------- start
+buildJoints();
+buildPerJoint();
+setUnits(S.units === 'rad' ? 'rad' : 'deg');
+// a theme picked in Settings wins; otherwise the system theme
+(() => { const t = store.get('theme', null); if (t) applyTheme(t); else { readColors(); for (const b of $$('#theme button')) b.classList.toggle('on', b.dataset.t === 'auto'); } })();
+new MutationObserver(readColors).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+new ResizeObserver(resize).observe(cv);
+new ResizeObserver(() => { if (dockOpen && dockTab === 'plot') drawChart(); }).observe($('#chart'));
+resize();
+if (glInit()) loadMeshes(); else logLine('', 'simple arm view: ' + G.failed);
+showPage(page);
+showDock(null, null);
+drawLegend();
+renderStatusBar();
+setInterval(uiTick, 100);
+setInterval(healthTick, 1000);
+requestAnimationFrame(loop);
+window.__raft = { S, G, HL, SC, fk, parseFrame, parseHealth, parseLine, send, showPage, showDock, openPal };
+connect();
+})();
+</script>
+</body>
+</html>

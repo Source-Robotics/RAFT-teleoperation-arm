@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    Recipe: raft
+    State stream for the RAFT leader arm's bilateral link (firmware/src/main/rti_link.cpp).
+    Copy this file into the PAR6 robot's data_recipe/ directory. The RAFT selects it itself on every
+    connect (reload_recipes, then set_recipe raft), so no restart is needed.
+
+    j_p        joint positions (rad, DH)        -> the follower pose the leader is coupled to
+    j_s        joint speeds (rad/s)             -> damping term of the coupling
+    t_ext      external joint torques (Nm)      -> contact force reflection (force_gain, off by default)
+    g_p        gripper position, RAW 0..255     -> trigger force feedback (a blocked gripper). The runtime's tag list
+               (0 open, 255 closed)                says metres; in firmware mode it is the raw scale of gripper_set.
+    g_c        gripper current (mA)             -> trigger force feedback (later)
+    tick       robot loop tick                  -> a packet not newer than the last one is dropped (duplicate, late)
+    rti_seq    last accepted command seq        -> round-trip check
+    rti_state  claim state                      -> the leader drops the coupling when control is revoked
+    mode       robot mode                       -> pairing waits for SOFT_RTI
+-->
+<recipe name="raft">
+    <field tag="j_p"   precision="5"/>
+    <field tag="j_s"   precision="4"/>
+    <field tag="t_ext" precision="4"/>
+    <field tag="g_p"   precision="5"/>
+    <field tag="g_c"   precision="1"/>
+    <field tag="tick"/>
+    <field tag="rti_seq"/>
+    <field tag="rti_state"/>
+    <field tag="mode"/>
+</recipe>

@@ -1,0 +1,16 @@
+; Import library definition for the MuJoCo functions raft_sim.cpp uses.
+; build.cmd turns it into out\mujoco.lib with MSVC's lib.exe, so the mujoco.dll that ships with the
+; MuJoCo Python package (pip install mujoco) is enough: no MuJoCo download, no Python at run time.
+LIBRARY mujoco
+EXPORTS
+    mj_loadXML
+    mj_makeData
+    mj_deleteData
+    mj_deleteModel
+    mj_resetData
+    mj_forward
+    mj_step
+    mj_setConst
+    mj_name2id
+    mj_applyFT
+    mj_versionString

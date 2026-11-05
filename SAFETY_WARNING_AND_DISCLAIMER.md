@@ -13,6 +13,28 @@ ONLY QUALIFIED INDIVIDUALS WITH APPROPRIATE TRAINING AND EXPERIENCE IN ROBOTICS,
 
 IF YOU DO NOT FULLY UNDERSTAND THE RISKS ASSOCIATED WITH ROBOTIC SYSTEMS, DO NOT USE, BUILD, OR DEPLOY THIS PROJECT ON PHYSICAL HARDWARE.
 
+# RAFT hazards
+
+RAFT is a small arm, but it is driven by servos under software control and it commands a larger robot. The
+[bring-up guide](firmware/docs/bringup.md#0-safety-rules) has the rules for each step; these apply always.
+
+- **The servo supply switch is the only hard stop.** Keep it within reach whenever the servos are powered. RAFT has
+  no physical E-stop button. LIMP in the web UI, Esc on the page and `mode limp` on the console switch torque off in
+  software only.
+- **The arm moves by itself.** Align, Hold, the moves to a pose and replays drive the joints without a hand on the
+  arm. Keep fingers out of the trigger hinge and the elbow while the arm is under torque.
+- **The arm drops when torque goes off.** LIMP, every fault and a reset cut torque at once. Support the arm when
+  torque goes on or off, and clamp the base to the table.
+- **Teleoperation moves PAR6.** PAR6 is a larger and stronger robot that follows the hand. Run it in a clear area,
+  with its own E-stop within reach of you or a second person. A software or network fault on either side can make
+  it move in a way you did not intend.
+- **Electrical.** The servos run from a 6 V supply that can deliver 5 A or more; use leads rated for it and a
+  supply with a current limit if you can. The ESP32-PoE without -ISO is not isolated: never connect USB while it is
+  powered over Ethernet (PoE), and with PoE the servo supply's output must be floating. Plug and unplug servos
+  only with the supply off.
+- **No login.** The web UI and TCP port 5000 have no password: anyone on the same network can move the arm and,
+  through it, PAR6. Use it on a network you trust.
+
 # Disclaimer
 
 THE PROJECT IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, OR NON-INFRINGEMENT.

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- RAFT on its own. Expands to the same robot as raft.urdf:
+       xacro raft.urdf.xacro > raft.urdf
+       xacro raft.urdf.xacro prefix:=leader_    (every link and joint name starts with leader_)
+     To put RAFT into a larger robot description, include raft_macro.xacro instead (see its header). -->
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="RAFT">
+  <xacro:arg name="prefix" default=""/>
+  <xacro:include filename="raft_macro.xacro"/>
+  <xacro:raft prefix="$(arg prefix)"/>
+</robot>

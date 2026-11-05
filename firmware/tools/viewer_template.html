@@ -1,0 +1,878 @@
+<title>RAFT URDF Viewer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a workbench. The 3D stage fills the left; a narrow instrument panel on the right holds
+   poses, joint sliders, the TCP readout and the gravity holding currents. Stacks on phones. */
+:root {
+  --bg: #e8ebee;
+  --panel: #f6f7f8;
+  --fg: #1b2127;
+  --muted: #5c6772;
+  --line: #d2d7dc;
+  --accent: #c8430c;
+  --accent-soft: #f6dccf;
+  --stage: #dde1e5;
+  --grid-major: #aeb6be;
+  --grid-minor: #c8ced4;
+  --ok: #2b7a3b;
+  --warn: #a66a00;
+  --hot: #c02626;
+  --track: #dfe3e7;
+  --f-display: "Barlow Semi Condensed", "Arial Narrow", "Roboto Condensed", sans-serif;
+  --f-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, Consolas, "Courier New", monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #14181c; --panel: #1b2025; --fg: #e2e6ea; --muted: #8e99a4; --line: #2c333a;
+    --accent: #ff7b3a; --accent-soft: #3a2418; --stage: #101316; --grid-major: #39424b; --grid-minor: #242a30;
+    --ok: #5cc26f; --warn: #e3a83a; --hot: #ff6b6b; --track: #2a3037; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #14181c; --panel: #1b2025; --fg: #e2e6ea; --muted: #8e99a4; --line: #2c333a;
+  --accent: #ff7b3a; --accent-soft: #3a2418; --stage: #101316; --grid-major: #39424b; --grid-minor: #242a30;
+  --ok: #5cc26f; --warn: #e3a83a; --hot: #ff6b6b; --track: #2a3037; color-scheme: dark;
+}
+html, body { height: 100%; }
+body {
+  background: var(--bg); color: var(--fg); font-family: var(--f-body); font-size: 14px;
+  display: grid; grid-template-columns: minmax(0, 1fr) 372px; overflow: hidden;
+}
+.stage { position: relative; min-width: 0; background: var(--stage); }
+.stage canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+.stage-top {
+  position: absolute; top: 12px; left: max(14px, env(safe-area-inset-left, 0px)); right: 14px;
+  display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; pointer-events: none;
+}
+.badge { pointer-events: auto; font-family: var(--f-display); letter-spacing: .02em; }
+.badge b { font-size: 22px; font-weight: 700; display: block; line-height: 1; }
+.badge span { font-family: var(--f-mono); font-size: 11.5px; color: var(--muted); }
+.views { display: flex; gap: 4px; pointer-events: auto; flex-wrap: wrap; }
+.btn {
+  font: 600 12.5px var(--f-display); letter-spacing: .06em; text-transform: uppercase;
+  color: var(--fg); background: var(--panel); border: 1px solid var(--line); border-radius: 4px;
+  padding: 5px 10px; cursor: pointer;
+}
+.btn:hover { border-color: var(--muted); }
+.btn:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.btn[aria-pressed="true"] { background: var(--accent); color: #fff; border-color: var(--accent); }
+.stage-foot {
+  position: absolute; left: max(14px, env(safe-area-inset-left, 0px)); bottom: 12px; right: 14px;
+  display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; pointer-events: none;
+  font-family: var(--f-mono); font-size: 11.5px; color: var(--muted);
+}
+#hover { color: var(--fg); min-height: 1em; }
+#status { color: var(--hot); }
+
+aside {
+  background: var(--panel); border-left: 1px solid var(--line); overflow-y: auto; min-width: 0;
+  padding-block: 18px 28px; padding-left: 18px; padding-right: max(18px, env(safe-area-inset-right, 0px));
+  display: flex; flex-direction: column; gap: 22px;
+}
+section { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+h2 {
+  margin: 0; font: 600 13px var(--f-display); letter-spacing: .12em; text-transform: uppercase; color: var(--muted);
+  display: flex; justify-content: space-between; align-items: baseline; gap: 8px;
+}
+h2 small { font: 400 11px var(--f-mono); letter-spacing: 0; text-transform: none; }
+.intro { font-size: 13px; line-height: 1.5; color: var(--muted); margin: 0; }
+.intro strong { color: var(--fg); font-weight: 600; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip {
+  font: 500 12.5px var(--f-body); color: var(--fg); background: transparent; border: 1px solid var(--line);
+  border-radius: 999px; padding: 4px 11px; cursor: pointer;
+}
+.chip:hover { border-color: var(--accent); }
+.chip[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); }
+
+.joint { display: grid; grid-template-columns: 96px minmax(0, 1fr) 62px; align-items: center; gap: 4px 10px; }
+.joint label { font-weight: 500; font-size: 13px; line-height: 1.15; }
+.joint label { min-width: 0; }
+.joint label i { display: block; font-style: normal; font-family: var(--f-mono); font-size: 10.5px; color: var(--muted); overflow-wrap: anywhere; }
+.joint input[type=range] { width: 100%; accent-color: var(--accent); min-width: 0; }
+.joint input[type=number] {
+  width: 100%; font: 500 12.5px var(--f-mono); font-variant-numeric: tabular-nums; text-align: right;
+  background: var(--bg); color: var(--fg); border: 1px solid var(--line); border-radius: 3px; padding: 3px 4px;
+}
+.joint .dh { grid-column: 2 / 4; font-family: var(--f-mono); font-size: 10.5px; color: var(--muted); margin-top: -3px; }
+
+.readout { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.cell { background: var(--bg); border: 1px solid var(--line); border-radius: 4px; padding: 6px 8px; min-width: 0; }
+.cell span { display: block; font: 500 10.5px var(--f-display); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+.cell output { font: 500 15px var(--f-mono); font-variant-numeric: tabular-nums; }
+
+.grav { display: flex; flex-direction: column; gap: 7px; }
+.grow { display: grid; grid-template-columns: 30px minmax(0, 1fr) 92px; gap: 8px; align-items: center; }
+.grow b { font: 600 13px var(--f-display); letter-spacing: .04em; }
+.bar { position: relative; height: 12px; background: var(--track); border-radius: 2px; overflow: hidden; }
+.bar .fill { position: absolute; inset: 0 auto 0 0; width: 0; background: var(--ok); border-radius: 2px; }
+.bar .fill.warn { background: var(--warn); }
+.bar .fill.hot { background: var(--hot); }
+.bar .tick { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--fg); opacity: .55; }
+.gval { font: 500 12px var(--f-mono); font-variant-numeric: tabular-nums; text-align: right; line-height: 1.15; }
+.gval i { display: block; font-style: normal; font-size: 10.5px; color: var(--muted); }
+.scale { display: grid; grid-template-columns: 30px minmax(0, 1fr) 92px; gap: 8px; font: 10.5px var(--f-mono); color: var(--muted); }
+.scale div { position: relative; height: 12px; }
+.scale div span { position: absolute; transform: translateX(-50%); white-space: nowrap; }
+.note { font-size: 12px; line-height: 1.5; color: var(--muted); margin: 0; }
+.toggles { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 12px; }
+.toggles label { display: flex; gap: 7px; align-items: center; font-size: 13px; cursor: pointer; }
+.toggles input { accent-color: var(--accent); }
+
+select.field, input.field {
+  font: 500 12.5px var(--f-mono); background: var(--bg); color: var(--fg);
+  border: 1px solid var(--line); border-radius: 3px; padding: 4px 6px; width: 100%; min-width: 0;
+}
+.mount { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
+.mount label { display: flex; flex-direction: column; gap: 3px; font: 500 10.5px var(--f-display); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.btnrow { display: flex; gap: 6px; flex-wrap: wrap; }
+.pills { display: flex; gap: 6px; flex-wrap: wrap; }
+.pill { font: 600 11px var(--f-display); letter-spacing: .06em; text-transform: uppercase; border-radius: 999px; padding: 3px 9px; border: 1px solid currentColor; }
+.pill.ok { color: var(--ok); } .pill.warn { color: var(--warn); } .pill.bad { color: var(--hot); }
+.sread { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.sread .cell output { font-size: 13.5px; }
+table.cad { width: 100%; border-collapse: collapse; font: 11.5px var(--f-mono); font-variant-numeric: tabular-nums; }
+table.cad th { font: 600 10.5px var(--f-display); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); text-align: left; padding: 3px 4px; border-bottom: 1px solid var(--line); }
+table.cad td { padding: 3px 4px; border-bottom: 1px solid var(--line); vertical-align: top; }
+table.cad td:first-child { font-family: var(--f-body); }
+.cadwrap { overflow-x: auto; }
+.lbl { position: absolute; pointer-events: none; font: 600 11px var(--f-display); letter-spacing: .04em; color: var(--fg);
+  background: var(--panel); border: 1px solid var(--line); border-radius: 3px; padding: 1px 5px; transform: translate(8px, -50%); white-space: nowrap; }
+.sweepout { font: 12px var(--f-mono); line-height: 1.5; color: var(--fg); min-height: 1.5em; }
+@media (max-width: 820px) {
+  body { display: block; overflow: auto; height: auto; }
+  .stage { height: 58vh; min-height: 320px; }
+  aside { border-left: 0; border-top: 1px solid var(--line); padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+}
+@media (max-width: 420px) {
+  .joint { grid-template-columns: 82px minmax(0, 1fr) 58px; }
+}
+</style>
+
+<main class="stage" id="stage">
+  <div class="stage-top">
+    <div class="badge"><b>RAFT</b><span>RAFT.urdf &middot; <span id="massTotal">-</span> g &middot; 7 joints</span></div>
+    <div class="views" role="group" aria-label="Camera view">
+      <button class="btn" id="viewIso" type="button" aria-pressed="true">Iso</button>
+      <button class="btn" id="viewFront" type="button" aria-pressed="false">Front</button>
+      <button class="btn" id="viewSide" type="button" aria-pressed="false">Side</button>
+      <button class="btn" id="viewTop" type="button" aria-pressed="false">Top</button>
+      <button class="btn" id="viewSpring" type="button" aria-pressed="false">Spring</button>
+    </div>
+  </div>
+  <div class="stage-foot">
+    <span id="hover">Hover a part to see its name and mass</span>
+    <span id="status"></span>
+    <span>Drag to orbit &middot; right-drag to pan &middot; scroll to zoom</span>
+  </div>
+</main>
+
+<aside>
+  <section>
+    <p class="intro"><strong>Corrected URDF of the RAFT leader arm.</strong> The page reads the URDF file itself and builds the joint tree from it, so what you see is what ROS or a simulator would load. Joint angles use the CAD convention: zero is the standby pose from the SolidWorks assembly.</p>
+  </section>
+
+  <section aria-labelledby="hPoses">
+    <h2 id="hPoses">Poses</h2>
+    <div class="chips" id="poses"></div>
+  </section>
+
+  <section aria-labelledby="hJoints">
+    <h2 id="hJoints">Joints <small>deg</small></h2>
+    <div id="joints" style="display:flex;flex-direction:column;gap:10px"></div>
+  </section>
+
+  <section aria-labelledby="hTcp">
+    <h2 id="hTcp">TCP <small>base frame, RCB rpy xyz</small></h2>
+    <div class="readout">
+      <div class="cell"><span>x mm</span><output id="tx">-</output></div>
+      <div class="cell"><span>y mm</span><output id="ty">-</output></div>
+      <div class="cell"><span>z mm</span><output id="tz">-</output></div>
+      <div class="cell"><span>roll</span><output id="rr">-</output></div>
+      <div class="cell"><span>pitch</span><output id="rp">-</output></div>
+      <div class="cell"><span>yaw</span><output id="ry">-</output></div>
+    </div>
+  </section>
+
+  <section aria-labelledby="hGrav">
+    <h2 id="hGrav">Gravity holding current <small>static, from URDF inertials</small></h2>
+    <div class="grav" id="grav"></div>
+    <div class="scale"><span></span><div id="scale"></div><span></span></div>
+    <p class="note">Current = torque / Kt with Kt = 0.441 Nm/A (datasheet, unverified on the bench). The tick marks the servo's 350 mA continuous rating; the bar ends at 1000 mA. J1 turns about a vertical axis and never carries gravity. With the spring fitted, J2 shows what the servo still has to supply.</p>
+  </section>
+
+  <section aria-labelledby="hSpring">
+    <h2 id="hSpring">J2 counterbalance <small>zero-length cable spring</small></h2>
+    <div class="toggles"><label><input type="checkbox" id="tSpring" checked> Fit the spring</label></div>
+    <label for="springSel" class="note">Spring</label>
+    <select id="springSel" class="field"></select>
+    <div class="mount" role="group" aria-label="Mount dimensions in mm">
+      <label for="mA">anchor a<input id="mA" class="field" type="number" step="0.5"></label>
+      <label for="mB">eyelet b<input id="mB" class="field" type="number" step="0.5"></label>
+      <label for="mF">pin f<input id="mF" class="field" type="number" step="0.5"></label>
+      <label for="mZ">plane z<input id="mZ" class="field" type="number" step="0.5"></label>
+      <label for="mP">plate<input id="mP" class="field" type="number" step="0.5"></label>
+    </div>
+    <p class="note">mm. <b>a</b>: anchor height above the J2 axis (post on the shoulder bracket). <b>b</b>: eyelet distance up the upper arm. <b>f</b>: spring pin distance up the arm. <b>z</b>: cable plane along the J2 axis (bar outer face at &minus;28.2). <b>plate</b>: crossing plate depth below the J2 axis.</p>
+    <div class="btnrow">
+      <button class="btn" id="mReset" type="button">Recommended mount</button>
+      <button class="btn" id="sweepJ2" type="button">Sweep J2</button>
+      <button class="btn" id="sweepJ3" type="button">Sweep J3</button>
+    </div>
+    <div class="pills" id="sStatus"></div>
+    <div class="sread">
+      <div class="cell"><span>balance</span><output id="sBal">-</output></div>
+      <div class="cell"><span>anchor-eyelet</span><output id="sAB">-</output></div>
+      <div class="cell"><span>spring length / room</span><output id="sLen">-</output></div>
+      <div class="cell"><span>stretch / rated</span><output id="sStr">-</output></div>
+      <div class="cell"><span>cable force / rated</span><output id="sF">-</output></div>
+      <div class="cell"><span>J2 without / with</span><output id="sJ2">-</output></div>
+      <div class="cell"><span>nearest part</span><output id="sClr">-</output></div>
+      <div class="cell"><span>pre-stretch at vertical</span><output id="sPre">-</output></div>
+    </div>
+    <div class="sweepout" id="sweepOut">Run a sweep to check the whole joint range.</div>
+    <h2>CAD coordinates <small>mm, standby pose</small></h2>
+    <div class="cadwrap"><table class="cad"><thead><tr><th>point</th><th>assembly X Y Z</th><th>part frame</th></tr></thead><tbody id="cadBody"></tbody></table></div>
+    <p class="note">Assembly = the SolidWorks assembly's default coordinate system (Y up, Z forward). Part frame: Coordinate System2 sits on the J2 axis (shoulder bracket parts), Coordinate System3 on the J3 axis (upper arm). <span id="springLink"></span></p>
+  </section>
+
+  <section aria-labelledby="hShow">
+    <h2 id="hShow">Show</h2>
+    <div class="toggles">
+      <label><input type="checkbox" id="tAxes" checked> Joint axes</label>
+      <label><input type="checkbox" id="tCom"> Centres of mass</label>
+      <label><input type="checkbox" id="tFrames"> Joint frames</label>
+      <label><input type="checkbox" id="tGhost"> See-through</label>
+    </div>
+    <p class="note">Joint limits in the URDF are placeholders (&plusmn;180&deg;, trigger &plusmn;90&deg;) until the real ranges are measured on the bench.</p>
+  </section>
+</aside>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+const DATA = /*__RAFT_DATA__*/null;
+
+(function () {
+  "use strict";
+  const status = document.getElementById("status");
+  if (!window.THREE || !THREE.OrbitControls) { status.textContent = "Could not load three.js from the CDN."; return; }
+
+  // ---------------------------------------------------------------- URDF parsing
+  const doc = new DOMParser().parseFromString(DATA.urdf, "application/xml");
+  const nums = (s, n) => (s || "").trim().split(/\s+/).filter(Boolean).map(Number).concat(Array(n).fill(0)).slice(0, n);
+  const links = {};
+  for (const el of doc.getElementsByTagName("link")) {
+    const L = { name: el.getAttribute("name"), mass: 0, com: [0, 0, 0], visual: null };
+    const inr = el.getElementsByTagName("inertial")[0];
+    if (inr) {
+      L.mass = Number(inr.getElementsByTagName("mass")[0].getAttribute("value"));
+      const o = inr.getElementsByTagName("origin")[0];
+      L.com = nums(o && o.getAttribute("xyz"), 3);
+    }
+    const vis = el.getElementsByTagName("visual")[0];
+    if (vis) {
+      const o = vis.getElementsByTagName("origin")[0];
+      const fn = vis.getElementsByTagName("mesh")[0].getAttribute("filename");
+      L.visual = { xyz: nums(o && o.getAttribute("xyz"), 3), rpy: nums(o && o.getAttribute("rpy"), 3), mesh: fn.split("/").pop().replace(/\.stl$/i, "") };
+    }
+    links[L.name] = L;
+  }
+  const joints = [];
+  for (const el of doc.getElementsByTagName("joint")) {
+    const o = el.getElementsByTagName("origin")[0], ax = el.getElementsByTagName("axis")[0], lim = el.getElementsByTagName("limit")[0];
+    joints.push({
+      name: el.getAttribute("name"), type: el.getAttribute("type"),
+      parent: el.getElementsByTagName("parent")[0].getAttribute("link"), child: el.getElementsByTagName("child")[0].getAttribute("link"),
+      xyz: nums(o && o.getAttribute("xyz"), 3), rpy: nums(o && o.getAttribute("rpy"), 3),
+      axis: ax ? nums(ax.getAttribute("xyz"), 3) : [0, 0, 1],
+      lower: lim ? Number(lim.getAttribute("lower")) : 0, upper: lim ? Number(lim.getAttribute("upper")) : 0,
+    });
+  }
+  const totalMass = Object.values(links).reduce((s, L) => s + L.mass, 0);
+  document.getElementById("massTotal").textContent = (totalMass * 1000).toFixed(1);
+
+  // ---------------------------------------------------------------- scene
+  const stage = document.getElementById("stage");
+  const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  stage.prepend(renderer.domElement);
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(32, 1, 0.005, 10);
+  const controls = new THREE.OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = false;
+
+  scene.add(new THREE.HemisphereLight(0xffffff, 0x6f7881, 0.5));
+  const sun = new THREE.DirectionalLight(0xffffff, 0.68);
+  sun.position.set(0.35, 0.8, 0.45); sun.castShadow = true;
+  sun.shadow.mapSize.set(2048, 2048);
+  Object.assign(sun.shadow.camera, { left: -0.35, right: 0.35, top: 0.35, bottom: -0.35, near: 0.1, far: 2 });
+  scene.add(sun);
+  const fill = new THREE.DirectionalLight(0xffffff, 0.18); fill.position.set(-0.5, 0.3, -0.4); scene.add(fill);
+
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 1.2), new THREE.ShadowMaterial({ opacity: 0.16 }));
+  floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; scene.add(floor);
+  let grid = null;
+
+  // URDF is z-up; three.js is y-up. Every robot-frame quantity is read relative to this group.
+  const robot = new THREE.Group(); robot.rotation.x = -Math.PI / 2; scene.add(robot);
+
+  const rpyQuat = (rpy) => new THREE.Quaternion().setFromEuler(new THREE.Euler(rpy[0], rpy[1], rpy[2], "ZYX"));
+  const linkObj = { base_link: new THREE.Group() };
+  robot.add(linkObj.base_link);
+  const jointObj = {};
+  let pending = joints.slice(), guard = 0;
+  while (pending.length && guard++ < 50) {
+    pending = pending.filter((j) => {
+      if (!linkObj[j.parent]) return true;
+      const frame = new THREE.Group();
+      frame.position.fromArray(j.xyz); frame.quaternion.copy(rpyQuat(j.rpy));
+      const motion = new THREE.Group(); frame.add(motion);
+      linkObj[j.parent].add(frame);
+      linkObj[j.child] = new THREE.Group(); motion.add(linkObj[j.child]);
+      jointObj[j.name] = { ...j, frame, motion, axisV: new THREE.Vector3().fromArray(j.axis).normalize(), q: 0 };
+      return false;
+    });
+  }
+
+  const LINK_COLOR = { base_link: 0x5a6673, link1: 0x7b8793, link2: 0xa6b0b9, link3: 0x627f98, link4: 0x99a5b0, link5: 0x6f859a, link6: 0xb0b9c1, gripper_trigger: 0xc8501a };
+  const meshes = [];
+  function decode(b64) { const s = atob(b64); const u = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) u[i] = s.charCodeAt(i); return u.buffer; }
+  for (const L of Object.values(links)) {
+    if (!L.visual || !DATA.meshes[L.visual.mesh]) continue;
+    const M = DATA.meshes[L.visual.mesh];
+    const qp = new Uint16Array(decode(M.pos)), idx = new Uint16Array(decode(M.idx));
+    const pos = new Float32Array(qp.length);
+    for (let i = 0; i < qp.length; i++) { const k = i % 3; pos[i] = M.min[k] + (qp[i] / 65535) * (M.max[k] - M.min[k]); }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute("position", new THREE.BufferAttribute(pos, 3)); g.setIndex(new THREE.BufferAttribute(idx, 1));
+    g.computeVertexNormals();
+    const mat = new THREE.MeshStandardMaterial({ color: LINK_COLOR[L.name] || 0x9aa4ad, roughness: 0.62, metalness: 0.08, flatShading: true, transparent: false, opacity: 1 });
+    const mesh = new THREE.Mesh(g, mat);
+    mesh.position.fromArray(L.visual.xyz); mesh.quaternion.copy(rpyQuat(L.visual.rpy));
+    mesh.castShadow = true; mesh.receiveShadow = true; mesh.userData.link = L;
+    linkObj[L.name].add(mesh); meshes.push(mesh);
+  }
+
+  // helpers: joint axes, centres of mass, joint frames, TCP triad
+  const helpers = { axes: [], com: [], frames: [] };
+  const accent = () => new THREE.Color(getComputedStyle(document.documentElement).getPropertyValue("--accent").trim() || "#c8430c");
+  for (const j of Object.values(jointObj)) {
+    if (j.type !== "revolute") continue;
+    const L = j.name === "gripper_trigger_joint" ? 0.03 : 0.055;
+    const geo = new THREE.BufferGeometry().setFromPoints([j.axisV.clone().multiplyScalar(-L), j.axisV.clone().multiplyScalar(L)]);
+    const line = new THREE.Line(geo, new THREE.LineDashedMaterial({ color: accent(), dashSize: 0.006, gapSize: 0.004, depthTest: false }));
+    line.computeLineDistances(); line.renderOrder = 5; j.frame.add(line); helpers.axes.push(line);
+  }
+  for (const L of Object.values(links)) {
+    if (!L.mass || !linkObj[L.name]) continue;
+    const r = 0.0042 * Math.cbrt(L.mass / 0.03);
+    const s = new THREE.Mesh(new THREE.SphereGeometry(r, 18, 12), new THREE.MeshBasicMaterial({ color: 0xffd43b, depthTest: false }));
+    s.position.fromArray(L.com); s.renderOrder = 6; s.visible = false; linkObj[L.name].add(s); helpers.com.push(s);
+  }
+  for (const [name, obj] of Object.entries(linkObj)) {
+    if (name === "tcp") continue;
+    const a = new THREE.AxesHelper(0.022); a.material.depthTest = false; a.renderOrder = 7; a.visible = false; obj.add(a); helpers.frames.push(a);
+  }
+  if (linkObj.tcp) { const a = new THREE.AxesHelper(0.04); a.material.depthTest = false; a.renderOrder = 7; linkObj.tcp.add(a); }
+
+  // ---------------------------------------------------------------- kinematics readouts
+  const ORDER = ["joint1", "joint2", "joint3", "joint4", "joint5", "joint6", "gripper_trigger_joint"].filter((n) => jointObj[n]);
+  const NAMES = { joint1: ["J1", "Base"], joint2: ["J2", "Shoulder"], joint3: ["J3", "Elbow"], joint4: ["J4", "Forearm roll"], joint5: ["J5", "Wrist pitch"], joint6: ["J6", "Wrist roll"], gripper_trigger_joint: ["J7", "Trigger"] };
+  const DH_OFFSET_DEG = { joint2: -90, joint3: 180, joint6: 180 };   // PAR6 / RCB theta = q_CAD + offset
+  const KT = 4.5 * 0.0980665, RATED_MA = 350, BAR_MAX_MA = 1000, G = 9.81;
+
+  // links below each joint (for the gravity sum)
+  const childrenOf = {};
+  for (const j of joints) (childrenOf[j.parent] = childrenOf[j.parent] || []).push(j.child);
+  const subtree = (name) => [name].concat(...(childrenOf[name] || []).map(subtree));
+  for (const j of Object.values(jointObj)) j.below = subtree(j.child).filter((n) => links[n] && links[n].mass > 0);
+
+  const inv = new THREE.Matrix4(), tmpM = new THREE.Matrix4();
+  function robotMatrix(obj) { return tmpM.multiplyMatrices(inv, obj.matrixWorld); }
+
+  // RCB runtime utility/kinematics_backend.py::write_rpy_xyz (SpatialMath tr2rpy order='xyz'), R[i][j] = e[j*4+i]
+  function rpyXYZ(e) {
+    const R = (i, j) => e[j * 4 + i];
+    const out = [0, 0, 0];
+    if (Math.abs(Math.abs(R(0, 2)) - 1) < 20 * Number.EPSILON) {
+      out[0] = 0;
+      out[2] = R(0, 2) > 0 ? Math.atan2(R(2, 1), R(1, 1)) : -Math.atan2(R(1, 0), R(2, 0));
+      out[1] = Math.asin(Math.max(-1, Math.min(1, R(0, 2))));
+      return out;
+    }
+    out[0] = -Math.atan2(R(0, 1), R(0, 0));
+    out[2] = -Math.atan2(R(1, 2), R(2, 2));
+    const a0 = Math.abs(R(0, 0)), a1 = Math.abs(R(0, 1)), a2 = Math.abs(R(1, 2)), a3 = Math.abs(R(2, 2));
+    if (a0 >= a1 && a0 >= a2 && a0 >= a3) out[1] = Math.atan(R(0, 2) * Math.cos(out[0]) / R(0, 0));
+    else if (a1 >= a2 && a1 >= a3) out[1] = -Math.atan(R(0, 2) * Math.sin(out[0]) / R(0, 1));
+    else if (a2 >= a3) out[1] = -Math.atan(R(0, 2) * Math.sin(out[2]) / R(1, 2));
+    else out[1] = Math.atan(R(0, 2) * Math.cos(out[2]) / R(2, 2));
+    return out;
+  }
+
+  // ---------------------------------------------------------------- UI
+  const deg = (r) => (r * 180) / Math.PI, rad = (d) => (d * Math.PI) / 180;
+  const wrap180 = (d) => { let x = ((d + 180) % 360 + 360) % 360 - 180; return x === -180 ? 180 : x; };
+  const jointsEl = document.getElementById("joints");
+  const ui = {};
+  for (const n of ORDER) {
+    const j = jointObj[n], [tag, label] = NAMES[n];
+    const lo = Math.round(deg(j.lower)), hi = Math.round(deg(j.upper));
+    const row = document.createElement("div"); row.className = "joint";
+    row.innerHTML = `<label for="s_${n}">${tag} ${label}<i>${n}</i></label>
+      <input type="range" id="s_${n}" min="${lo}" max="${hi}" step="0.5" value="0">
+      <input type="number" id="n_${n}" min="${lo}" max="${hi}" step="1" value="0" aria-label="${tag} angle in degrees">
+      <div class="dh" id="d_${n}"></div>`;
+    jointsEl.appendChild(row);
+    const s = row.querySelector("input[type=range]"), num = row.querySelector("input[type=number]");
+    s.addEventListener("input", () => { setJoint(n, Number(s.value)); clearPose(); update(); });
+    num.addEventListener("change", () => { const v = Math.max(lo, Math.min(hi, Number(num.value) || 0)); setJoint(n, v); clearPose(); update(); });
+    ui[n] = { s, num, dh: row.querySelector(".dh") };
+  }
+  function setJoint(n, d) {
+    const j = jointObj[n]; j.q = rad(d);
+    j.motion.quaternion.setFromAxisAngle(j.axisV, j.q);
+    ui[n].s.value = d; ui[n].num.value = Math.round(d * 10) / 10;
+    const off = DH_OFFSET_DEG[n];
+    ui[n].dh.textContent = n === "gripper_trigger_joint" ? "trigger, no PAR6 equivalent" : `PAR6 θ = ${wrap180(d + (off || 0)).toFixed(1)}°`;
+  }
+
+  // poses: upper arm tilted t forward from vertical, forearm d below horizontal -> q2 = t, q3 = t - d
+  const POSES = [
+    ["Standby", [0, 0, 0, 0, 0, 0, 0]],
+    ["Handle in front", [0, 20, 0, 0, 0, 0, 0]],
+    ["Reach forward", [0, 45, 45, 0, 0, 0, 0]],
+    ["Stretched", [0, 90, 90, 0, 0, 0, 0]],
+    ["Forearm down", [0, 0, -70, 0, 0, 0, 0]],
+    ["Wrist and trigger", [35, 15, -10, 60, -45, 90, 25]],
+  ];
+  const posesEl = document.getElementById("poses");
+  const poseBtns = POSES.map(([name, q], i) => {
+    const b = document.createElement("button"); b.type = "button"; b.className = "chip"; b.textContent = name; b.setAttribute("aria-pressed", i === 0 ? "true" : "false");
+    b.addEventListener("click", () => { ORDER.forEach((n, k) => setJoint(n, q[k])); poseBtns.forEach((x) => x.setAttribute("aria-pressed", String(x === b))); update(); });
+    posesEl.appendChild(b); return b;
+  });
+  function clearPose() { poseBtns.forEach((x) => x.setAttribute("aria-pressed", "false")); }
+
+  const gravEl = document.getElementById("grav");
+  const gRows = {};
+  for (const n of ORDER.slice(1)) {
+    const row = document.createElement("div"); row.className = "grow";
+    row.innerHTML = `<b>${NAMES[n][0]}</b><div class="bar"><div class="fill"></div><div class="tick" style="left:${(100 * RATED_MA) / BAR_MAX_MA}%"></div></div><div class="gval"><span>-</span><i>-</i></div>`;
+    gravEl.appendChild(row);
+    gRows[n] = { fill: row.querySelector(".fill"), ma: row.querySelector(".gval span"), nm: row.querySelector(".gval i") };
+  }
+  const scaleEl = document.getElementById("scale");
+  for (const v of [0, 350, 700, 1000]) { const s = document.createElement("span"); s.style.left = `${(100 * v) / BAR_MAX_MA}%`; if (v === 0) s.style.transform = "none"; if (v === 1000) s.style.transform = "translateX(-100%)"; s.textContent = v === 1000 ? "1000 mA" : String(v); scaleEl.appendChild(s); }
+
+  const out = (id) => document.getElementById(id);
+  function update() {
+    scene.updateMatrixWorld(true);
+    const spst = updateSpring();                      // J2 counterbalance: geometry follows q2, state for the readouts
+    scene.updateMatrixWorld(true);
+    inv.copy(robot.matrixWorld).invert();
+    let j2Gravity = 0, j2Servo = 0;
+    // gravity: holding torque = -(axis . sum over distal links of (c - o) x m g)
+    const gz = new THREE.Vector3(0, 0, -G);
+    for (const n of ORDER.slice(1)) {
+      const j = jointObj[n];
+      const Mf = robotMatrix(j.frame).clone();
+      const o = new THREE.Vector3().setFromMatrixPosition(Mf);
+      const z = j.axisV.clone().transformDirection(Mf);
+      const mom = new THREE.Vector3();
+      for (const ln of j.below) {
+        const c = new THREE.Vector3().fromArray(links[ln].com).applyMatrix4(robotMatrix(linkObj[ln]));
+        mom.add(c.sub(o).cross(gz.clone().multiplyScalar(links[ln].mass)));
+      }
+      const tauG = -z.dot(mom);
+      const tau = n === "joint2" && spst ? tauG - spst.tau : tauG;   // what the servo still supplies
+      if (n === "joint2") { j2Gravity = tauG; j2Servo = tau; }
+      const ma = (1000 * Math.abs(tau)) / KT, r = gRows[n];
+      r.fill.style.width = `${Math.min(100, (100 * ma) / BAR_MAX_MA)}%`;
+      r.fill.className = "fill" + (ma > 2 * RATED_MA ? " hot" : ma > RATED_MA ? " warn" : "");
+      r.ma.textContent = `${ma.toFixed(0)} mA`;
+      r.nm.textContent = `${tau >= 0 ? "+" : "−"}${Math.abs(tau).toFixed(3)} Nm`;
+    }
+    if (linkObj.tcp) {
+      const M = robotMatrix(linkObj.tcp), e = M.elements, p = new THREE.Vector3().setFromMatrixPosition(M), rpy = rpyXYZ(e);
+      out("tx").textContent = (p.x * 1000).toFixed(1); out("ty").textContent = (p.y * 1000).toFixed(1); out("tz").textContent = (p.z * 1000).toFixed(1);
+      out("rr").textContent = deg(rpy[0]).toFixed(1) + "°"; out("rp").textContent = deg(rpy[1]).toFixed(1) + "°"; out("ry").textContent = deg(rpy[2]).toFixed(1) + "°";
+    }
+    if (spst) {
+      lastClear = clearance(spst);
+      springReadout(spst, j2Gravity, j2Servo);
+      const A = new THREE.Vector3().setFromMatrixPosition(ptA.matrixWorld), B = new THREE.Vector3().setFromMatrixPosition(ptB.matrixWorld);
+      const Mw = new THREE.Vector3().setFromMatrixPosition(ptM.matrixWorld);
+      const pos = cable.geometry.attributes.position;
+      pos.setXYZ(0, Mw.x, Mw.y, Mw.z); pos.setXYZ(1, B.x, B.y, B.z); pos.setXYZ(2, A.x, A.y, A.z); pos.needsUpdate = true;
+    } else {
+      document.getElementById("sStatus").innerHTML = '<span class="pill warn">spring not fitted</span>';
+    }
+    render();
+  }
+
+  // ---------------------------------------------------------------- J2 counterbalance (docs/spring_mount.md)
+  // All mount numbers in mm in DH frame 1: origin on the J2 axis, z1 along the J2 axis, up = -y1 at the
+  // zero pose. The post rides on the shoulder bracket (joint2.frame = DH frame 1); the eyelet, pin and
+  // spring ride on the upper arm (joint2.motion), whose axis points along -y.
+  const SPRINGS = [
+    { set: "fed", shop: "federnshop", code: "Z-075NI", d: 0.8, De: 6.0, L0: 50.0, R: 0.565, F0: 3.13, sn: 53.58, Fn: 33.4, price: "EUR 6.16", url: "https://www.federnshop.com/en/products/extension_springs/z-075ni.html" },
+    { set: "fed", shop: "federnshop", code: "Z-078AI", d: 0.8, De: 5.8, L0: 45.1, R: 0.718, F0: 3.22, sn: 43.51, Fn: 34.46, price: "EUR 6.09", url: "https://www.federnshop.com/en/products/extension_springs/z-078ai.html" },
+    { set: "fed", shop: "federnshop", code: "Z-078I", d: 0.8, De: 5.8, L0: 40.3, R: 0.824, F0: 3.23, sn: 37.9, Fn: 34.46, price: "EUR 5.98", url: "https://www.federnshop.com/en/products/extension_springs/z-078i.html" },
+    { set: "fed", shop: "federnshop", code: "Z-077AI", d: 0.8, De: 5.8, L0: 34.0, R: 1.027, F0: 3.22, sn: 30.41, Fn: 34.46, price: "EUR 5.98", url: "https://www.federnshop.com/en/products/extension_springs/z-077ai.html" },
+    { set: "lee", shop: "Lee Spring", code: "LEM080C 05 M", d: 0.79, De: 6.3, L0: 30.0, R: 1.028, F0: 3.247, sn: 20.57, Fn: 24.51, price: "EUR 3.19", url: "https://www.leespring.de/product/extension-spring-lem080c05m-music-wire" },
+    { set: "lee", shop: "Lee Spring", code: "LEM080C 06 M", d: 0.79, De: 6.3, L0: 35.0, R: 0.821, F0: 3.247, sn: 25.91, Fn: 24.51, price: "EUR 3.19", url: "https://www.leespring.de/product/extension-spring-lem080c06m-music-wire" },
+    { set: "lee", shop: "Lee Spring", code: "LEM080C 06 S", d: 0.79, De: 6.3, L0: 35.0, R: 0.685, F0: 2.705, sn: 25.91, Fn: 20.42, price: "EUR 3.57", url: "https://www.leespring.de/product/extension-spring-lem080c06s-stainless-steel" },
+    { set: "lee", shop: "Lee Spring", code: "LEM080C 07 M", d: 0.79, De: 6.3, L0: 40.0, R: 0.683, F0: 3.247, sn: 31.24, Fn: 24.51, price: "EUR 3.37", url: "https://www.leespring.de/product/extension-spring-lem080c07m-music-wire" },
+    { set: "lee", shop: "Lee Spring", code: "LEM080C 08 M", d: 0.79, De: 6.3, L0: 45.0, R: 0.585, F0: 3.247, sn: 36.32, Fn: 24.51, price: "EUR 3.37", url: "https://www.leespring.de/product/extension-spring-lem080c08m-music-wire" },
+    { set: "so", shop: "Springs Online", code: "SOTRI0073", d: 1.0, De: 11.0, L0: 40.4, R: 0.34, F0: 3.55, sn: 61.9, Fn: 24.6, price: "EUR 2.93", url: "https://www.springsonline.net/it/sotri0073-molla-trazione-uni-8526-acciaio-inox.html" },
+    { set: "so", shop: "Springs Online", code: "SOTR0073", d: 1.0, De: 11.0, L0: 40.4, R: 0.41, F0: 4.22, sn: 61.9, Fn: 29.6, price: "EUR 2.75", url: "https://www.springsonline.net/it/sotr0073-molla-trazione-uni-8526-acciaio-carbonio.html" },
+    { set: "so", shop: "Springs Online", code: "SOTRI0072", d: 1.0, De: 11.0, L0: 31.4, R: 0.53, F0: 3.61, sn: 39.6, Fn: 24.6, price: "EUR 2.93", url: "https://www.springsonline.net/it/sotri0072-molla-trazione-uni-8526-acciaio-inox.html" },
+    { set: "so", shop: "Springs Online", code: "SOTR0072", d: 1.0, De: 11.0, L0: 31.4, R: 0.64, F0: 4.26, sn: 39.6, Fn: 29.6, price: "EUR 2.75", url: "https://www.springsonline.net/it/sotr0072-molla-trazione-uni-8526-acciaio-carbonio.html" },
+  ];
+  const MOUNTS = { fed: { a: 13, b: 20, f: 101, z: -33, plate: 13.5 }, lee: { a: 13, b: 20, f: 101, z: -33, plate: 13.5 }, so: { a: 16, b: 27, f: 103, z: -35, plate: 13.5 } };
+  const BAR_FACE = -28.2, LINK1_FACE = -21.4, M_Q2 = 0.2269, EYE_MARGIN = 4, MM = 1e-3;
+  let springIdx = 2, mount = Object.assign({}, MOUNTS.fed), springOn = true;
+  const sp = { post: new THREE.Group(), arm: new THREE.Group() };
+  const matPart = new THREE.MeshStandardMaterial({ color: 0x2f9e7a, roughness: 0.5, metalness: 0.1 });       // new printed parts
+  const matMetal = new THREE.MeshStandardMaterial({ color: 0xa7b0b8, roughness: 0.35, metalness: 0.6 });
+  const matSpring = new THREE.MeshStandardMaterial({ color: 0xe0b030, roughness: 0.35, metalness: 0.5 });
+  const cableMat = new THREE.LineBasicMaterial({ color: accent() });
+  const cable = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()]), cableMat);
+  cable.frustumCulled = false;
+  scene.add(cable);
+  jointObj.joint2.frame.add(sp.post);
+  jointObj.joint2.motion.add(sp.arm);
+  const ptA = new THREE.Object3D(), ptB = new THREE.Object3D(), ptM = new THREE.Object3D(), ptF = new THREE.Object3D();
+  sp.post.add(ptA); sp.arm.add(ptB); sp.arm.add(ptM); sp.arm.add(ptF);
+  let springMesh = null;
+  const statics = [];
+
+  function cylBetween(p0, p1, r, mat) {                 // cylinder from p0 to p1 (mm, local frame)
+    const a = new THREE.Vector3().fromArray(p0).multiplyScalar(MM), b = new THREE.Vector3().fromArray(p1).multiplyScalar(MM);
+    const len = a.distanceTo(b);
+    const m = new THREE.Mesh(new THREE.CylinderGeometry(r * MM, r * MM, Math.max(len, 1e-5), 20), mat);
+    m.position.copy(a).add(b).multiplyScalar(0.5);
+    m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), b.clone().sub(a).normalize());
+    m.castShadow = true;
+    return m;
+  }
+  function buildStatics() {
+    for (const o of statics) { o.parent.remove(o); o.geometry.dispose(); }
+    statics.length = 0;
+    const m = mount, add = (parent, o) => { parent.add(o); statics.push(o); };
+    // crossing plate below the J2 axis, from the shoulder bracket's outer face out to the cable plane, then the post
+    const plateLen = Math.abs(m.z - LINK1_FACE);
+    const plate = new THREE.Mesh(new THREE.BoxGeometry(8 * MM, 3 * MM, plateLen * MM), matPart);
+    plate.position.set(0, m.plate * MM, (m.z + LINK1_FACE) / 2 * MM);
+    add(sp.post, plate);
+    add(sp.post, cylBetween([0, m.plate, m.z], [0, -m.a, m.z], 2.0, matPart));
+    const anchor = new THREE.Mesh(new THREE.SphereGeometry(2.2 * MM, 16, 12), matMetal);
+    anchor.position.set(0, -m.a * MM, m.z * MM); add(sp.post, anchor);
+    // eyelet: standoff from the bar face plus a smooth ring the cable runs through along the arm
+    add(sp.arm, cylBetween([0, -m.b, BAR_FACE], [0, -m.b, m.z - 1.5], 2.0, matPart));
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(2.0 * MM, 0.6 * MM, 10, 24), matMetal);
+    ring.rotation.x = Math.PI / 2; ring.position.set(0, -m.b * MM, m.z * MM); add(sp.arm, ring);
+    // spring pin near the elbow end of the bar
+    add(sp.arm, cylBetween([0, -m.f, BAR_FACE], [0, -m.f, m.z + 2.5], 1.5, matMetal));
+    ptA.position.set(0, -m.a * MM, m.z * MM); ptB.position.set(0, -m.b * MM, m.z * MM); ptF.position.set(0, -m.f * MM, m.z * MM);
+    cadTable();
+  }
+
+  class Helix extends THREE.Curve {
+    constructor(r, y0, y1, turns, z) { super(); this.r = r; this.y0 = y0; this.y1 = y1; this.turns = turns; this.z = z; }
+    getPoint(t, target = new THREE.Vector3()) {
+      const th = 2 * Math.PI * this.turns * t;
+      return target.set(this.r * Math.cos(th), this.y0 + (this.y1 - this.y0) * t, this.z + this.r * Math.sin(th));
+    }
+  }
+  function buildSpring(L) {                              // L = pin-to-pin length (mm)
+    if (springMesh) { sp.arm.remove(springMesh); springMesh.traverse((o) => o.geometry && o.geometry.dispose()); }
+    const s = SPRINGS[springIdx], m = mount;
+    const Di = s.De - 2 * s.d, Rm = (s.De - s.d) / 2;
+    const turns = Math.max(4, Math.round((s.L0 - 2 * Di) / s.d));
+    const g = new THREE.Group();
+    const yF = -m.f, yM = -m.f + L;                      // fixed end (elbow side) to moving end (toward J2)
+    const body = new THREE.Mesh(new THREE.TubeGeometry(new Helix(Rm * MM, (yF + Di) * MM, (yM - Di) * MM, turns, m.z * MM),
+                                                         Math.min(1200, turns * 12), s.d / 2 * MM, 5, false), matSpring);
+    g.add(body);
+    for (const [y, sgn] of [[yF, 1], [yM, -1]]) {        // German eyelets, in the plane of the pin
+      const loop = new THREE.Mesh(new THREE.TorusGeometry(Rm * MM, s.d / 2 * MM, 6, 28), matSpring);
+      loop.position.set(0, (y + sgn * Rm) * MM, m.z * MM);
+      g.add(loop);
+    }
+    g.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+    springMesh = g;
+    sp.arm.add(g);
+  }
+
+  function springState(q2) {
+    const s = SPRINGS[springIdx], m = mount;
+    const Bx = Math.sin(q2) * m.b, By = -Math.cos(q2) * m.b;
+    const AB = Math.hypot(Bx, By + m.a);                  // both ends in the same cable plane
+    const slack = s.F0 / s.R, taut = AB >= slack;
+    const x = Math.max(0, AB - slack), L = s.L0 + x, F = taut ? s.R * AB : 0;
+    return {
+      s, AB, slack, taut, x, L, F, room: m.f - m.b - EYE_MARGIN,
+      tau: taut ? -s.R * m.a * m.b * Math.sin(q2) * MM : 0,        // Nm about +z1, same sign as the gravity load
+      balance: (s.R * m.a * m.b * MM) / M_Q2, pre: Math.abs(m.a - m.b) - slack,
+    };
+  }
+
+  // ---- clearance: nearest mesh vertex to sample points on the hardware, via a spatial hash per mesh
+  const CELL = 0.006;
+  const hkey = (i, j, k) => i * 73856093 ^ j * 19349663 ^ k * 83492791;
+  for (const mesh of meshes) {
+    const p = mesh.geometry.attributes.position.array, map = new Map();
+    for (let i = 0; i < p.length; i += 3) {
+      const k = hkey(Math.floor(p[i] / CELL), Math.floor(p[i + 1] / CELL), Math.floor(p[i + 2] / CELL));
+      let a = map.get(k); if (!a) map.set(k, (a = [])); a.push(i);
+    }
+    mesh.userData.hash = map;
+  }
+  const _v = new THREE.Vector3(), _inv = new THREE.Matrix4();
+  function nearestDist(mesh, pw) {                      // pw in world; returns m, or Infinity if nothing within ~CELL
+    _v.copy(pw).applyMatrix4(mesh.userData.inv);
+    const p = mesh.geometry.attributes.position.array, map = mesh.userData.hash;
+    const ci = Math.floor(_v.x / CELL), cj = Math.floor(_v.y / CELL), ck = Math.floor(_v.z / CELL);
+    let best = Infinity;
+    for (let di = -1; di <= 1; di++) for (let dj = -1; dj <= 1; dj++) for (let dk = -1; dk <= 1; dk++) {
+      const a = map.get(hkey(ci + di, cj + dj, ck + dk)); if (!a) continue;
+      for (const i of a) { const dx = p[i] - _v.x, dy = p[i + 1] - _v.y, dz = p[i + 2] - _v.z; const d2 = dx * dx + dy * dy + dz * dz; if (d2 < best) best = d2; }
+    }
+    return Math.sqrt(best);
+  }
+  function samples(local, from, to, r, step = 1.5) {      // points along a segment (mm, in `local`'s frame) -> world
+    const a = new THREE.Vector3().fromArray(from).multiplyScalar(MM), b = new THREE.Vector3().fromArray(to).multiplyScalar(MM);
+    const n = Math.max(2, Math.ceil(a.distanceTo(b) / (step * MM)) + 1), out = [];
+    for (let i = 0; i < n; i++) out.push(a.clone().lerp(b, i / (n - 1)).applyMatrix4(local.matrixWorld));
+    return { pts: out, r: r * MM };
+  }
+  function clearance(st) {
+    const m = mount, s = st.s;
+    for (const mesh of meshes) mesh.userData.inv = _inv.copy(mesh.matrixWorld).invert().clone();
+    const items = [
+      ["spring", samples(sp.arm, [0, -m.f, m.z], [0, -m.f + st.L, m.z], s.De / 2), ["link2"]],
+      ["eyelet", samples(sp.arm, [0, -m.b, BAR_FACE - 0.5], [0, -m.b, m.z], 2.6), ["link2"]],
+      ["spring pin", samples(sp.arm, [0, -m.f, BAR_FACE - 0.5], [0, -m.f, m.z + 2.5], 1.5), ["link2"]],
+      ["cable to spring", samples(sp.arm, [0, -m.b - 2, m.z], [0, -m.f + st.L, m.z], 0.5), ["link2"]],
+      ["post", samples(sp.post, [0, m.plate, m.z], [0, -m.a, m.z], 2.0), ["link1"]],
+      ["crossing plate", samples(sp.post, [0, m.plate, LINK1_FACE - 1], [0, m.plate, m.z], 1.5), ["link1"]],
+    ];
+    // cable from the eyelet to the anchor, ends trimmed (they sit in their own mounts)
+    const A = new THREE.Vector3().setFromMatrixPosition(ptA.matrixWorld), B = new THREE.Vector3().setFromMatrixPosition(ptB.matrixWorld);
+    const len = A.distanceTo(B), cpts = [];
+    for (let t = 3 * MM; t < len - 3 * MM; t += 1.5 * MM) cpts.push(B.clone().lerp(A, t / len));
+    items.push(["cable to anchor", { pts: cpts, r: 0.5 * MM }, []]);
+    let best = { d: Infinity, what: "" };
+    for (const [name, it, skip] of items) {
+      for (const mesh of meshes) {
+        const ln = mesh.userData.link.name;
+        if (skip.includes(ln)) continue;
+        for (const pw of it.pts) {
+          const d = nearestDist(mesh, pw) - it.r;
+          if (d < best.d) best = { d, what: `${name} / ${ln}` };
+        }
+      }
+    }
+    return best;
+  }
+
+  // ---- CAD coordinates: DH frame 1 (mm) -> base -> SolidWorks assembly default frame (gen_model.py mapping)
+  function toAssembly(p1) {            // standby pose: frame 1 = Tx(13) Tz(51.22) Rx(-90)
+    const x0 = 13 + p1[0], y0 = p1[2], z0 = 51.22 - p1[1];
+    return [y0 + 14.26, z0 - 51.22, x0];
+  }
+  const fmt3 = (v) => v.map((x) => (Math.abs(x) < 0.05 ? 0 : x).toFixed(1)).join("  ");
+  function cadTable() {
+    const m = mount;
+    const rows = [
+      ["J2 axis (along X)", [0, 0, 0], "CS2 origin"],
+      ["bar outer face (plane)", [0, 0, BAR_FACE], `CS2 z = ${BAR_FACE}`],
+      ["anchor A, top of post (shoulder bracket)", [0, -m.a, m.z], `CS2  0  ${(-m.a).toFixed(1)}  ${m.z.toFixed(1)}`],
+      ["crossing plate (3 mm, below J2)", [0, m.plate, (m.z + LINK1_FACE) / 2], `CS2 y = ${m.plate.toFixed(1)}, z ${LINK1_FACE} .. ${m.z.toFixed(1)}`],
+      ["eyelet B (upper arm)", [0, -m.b, m.z], `CS3  ${(m.b - 100).toFixed(1)}  0  ${(-m.z).toFixed(1)}`],
+      ["spring pin F (upper arm)", [0, -m.f, m.z], `CS3  ${(m.f - 100).toFixed(1)}  0  ${(-m.z).toFixed(1)}`],
+    ];
+    document.getElementById("cadBody").innerHTML = rows.map(([n, p, loc]) => `<tr><td>${n}</td><td>${fmt3(toAssembly(p))}</td><td>${loc}</td></tr>`).join("");
+  }
+
+  // ---- UI
+  const sel = document.getElementById("springSel");
+  const SET_LABEL = { fed: "federnshop.com (mount a 13 / b 20)", lee: "leespring.de (mount a 13 / b 20)", so: "springsonline.net (mount a 16 / b 27)" };
+  const SET_NOTE = { fed: " (business buyers only)", lee: " each, single pieces (EUR 15 fee below EUR 50 net)", so: " (excl. VAT)" };
+  let lastSet = "";
+  for (const [i, s] of SPRINGS.entries()) {
+    if (s.set !== lastSet) { const og = document.createElement("optgroup"); og.label = SET_LABEL[s.set]; sel.appendChild(og); lastSet = s.set; }
+    const o = document.createElement("option");
+    o.value = String(i);
+    o.textContent = `${s.code}  ${s.R.toFixed(3)} N/mm  ${Math.round((100 * s.R * MOUNTS[s.set].a * MOUNTS[s.set].b * MM) / M_Q2)} %  ${s.d} x ${s.De} x ${s.L0}`;
+    sel.lastChild.appendChild(o);
+  }
+  sel.value = String(springIdx);
+  const mInputs = { a: "mA", b: "mB", f: "mF", z: "mZ", plate: "mP" };
+  function showMount() { for (const [k, id] of Object.entries(mInputs)) document.getElementById(id).value = mount[k]; }
+  function setSpring(i) {
+    const prev = SPRINGS[springIdx].set;
+    springIdx = i;
+    if (SPRINGS[i].set !== prev) { mount = Object.assign({}, MOUNTS[SPRINGS[i].set]); showMount(); buildStatics(); }
+    const s = SPRINGS[i];
+    document.getElementById("springLink").innerHTML = `Selected: <a href="${s.url}" target="_blank" rel="noopener">${s.shop} ${s.code}</a>, ${s.price}${SET_NOTE[s.set]}.`;
+    lastSweep = "";
+    document.getElementById("sweepOut").textContent = "Run a sweep to check the whole joint range.";
+    update();
+  }
+  sel.addEventListener("change", () => setSpring(Number(sel.value)));
+  for (const [k, id] of Object.entries(mInputs)) {
+    document.getElementById(id).addEventListener("change", (e) => { const v = Number(e.target.value); if (Number.isFinite(v)) { mount[k] = v; buildStatics(); update(); } });
+  }
+  document.getElementById("mReset").addEventListener("click", () => { mount = Object.assign({}, MOUNTS[SPRINGS[springIdx].set]); showMount(); buildStatics(); update(); });
+  document.getElementById("tSpring").addEventListener("change", (e) => { springOn = e.target.checked; update(); });
+
+  let lastSweep = "", sweeping = false;
+  function sweep(n, lo, hi) {
+    if (sweeping) return;
+    sweeping = true;
+    const j = jointObj[n], start = deg(j.q);
+    let a = lo, worst = { d: Infinity }, maxStr = 0, maxF = 0, tooLong = null, slackAt = null;
+    const out = document.getElementById("sweepOut");
+    const stepFn = () => {
+      setJoint(n, a); update();
+      const st = springState(jointObj.joint2.q), c = lastClear;
+      if (c.d < worst.d) worst = { d: c.d, what: c.what, at: a };
+      maxStr = Math.max(maxStr, st.x / st.s.sn); maxF = Math.max(maxF, st.F / st.s.Fn);
+      if (!st.taut && slackAt === null) slackAt = a;
+      if (st.L > st.room && tooLong === null) tooLong = a;
+      out.textContent = `${NAMES[n][0]} at ${a.toFixed(0)} deg ...`;
+      a += 2.5;
+      if (a <= hi) { requestAnimationFrame(stepFn); return; }
+      setJoint(n, start); update(); sweeping = false;
+      const clr = worst.d === Infinity ? "> 6 mm" : `${(worst.d * 1000).toFixed(1)} mm (${worst.what} at ${worst.at.toFixed(0)} deg)`;
+      lastSweep = `${NAMES[n][0]} ${lo} to ${hi} deg: nearest ${clr}; stretch <= ${(100 * maxStr).toFixed(0)} % and force <= ${(100 * maxF).toFixed(0)} % of rating` +
+        (tooLong !== null ? `; spring too long from ${tooLong.toFixed(0)} deg` : "") + (slackAt !== null ? `; slack at ${slackAt.toFixed(0)} deg` : "");
+      out.textContent = lastSweep;
+    };
+    stepFn();
+  }
+  document.getElementById("sweepJ2").addEventListener("click", () => sweep("joint2", -105, 130));
+  document.getElementById("sweepJ3").addEventListener("click", () => sweep("joint3", -75, 150));
+
+  // labels on the stage
+  const labels = [["A anchor", ptA], ["B eyelet", ptB], ["F spring pin", ptF]].map(([t, o]) => {
+    const el = document.createElement("div"); el.className = "lbl"; el.textContent = t; stage.appendChild(el); return { el, o };
+  });
+  function updateLabels() {
+    const w = renderer.domElement.clientWidth, h = renderer.domElement.clientHeight;
+    for (const { el, o } of labels) {
+      if (!springOn) { el.hidden = true; continue; }
+      const p = new THREE.Vector3().setFromMatrixPosition(o.matrixWorld).project(camera);
+      el.hidden = p.z > 1;
+      el.style.left = `${((p.x + 1) / 2) * w}px`; el.style.top = `${((1 - p.y) / 2) * h}px`;
+    }
+  }
+
+  let lastClear = { d: Infinity, what: "" };
+  function updateSpring() {                             // returns the spring state when fitted, else null
+    sp.post.visible = sp.arm.visible = cable.visible = springOn;
+    if (!springOn) return null;
+    const st = springState(jointObj.joint2.q);
+    buildSpring(st.L);
+    ptM.position.set(0, (-mount.f + st.L) * MM, mount.z * MM);
+    return st;
+  }
+  function springReadout(st, tauG, tauServo) {
+    const pct = (x) => `${(100 * x).toFixed(0)} %`;
+    out("sBal").textContent = pct(st.balance);
+    out("sAB").textContent = `${st.AB.toFixed(1)} mm`;
+    out("sLen").textContent = `${st.L.toFixed(1)} / ${st.room.toFixed(0)} mm`;
+    out("sStr").textContent = `${st.x.toFixed(1)} / ${st.s.sn.toFixed(0)} mm`;
+    out("sF").textContent = `${st.F.toFixed(1)} / ${st.s.Fn.toFixed(0)} N`;
+    out("sJ2").textContent = `${((1000 * Math.abs(tauG)) / KT).toFixed(0)} / ${((1000 * Math.abs(tauServo)) / KT).toFixed(0)} mA`;
+    out("sPre").textContent = st.pre >= 0 ? `${st.pre.toFixed(1)} mm` : "slack zone";
+    const c = lastClear;
+    out("sClr").textContent = c.d === Infinity ? "> 6 mm" : `${(c.d * 1000).toFixed(1)} mm`;
+    out("sClr").title = c.what;
+    const pills = [];
+    pills.push(st.L <= st.room ? ["ok", "fits"] : ["bad", "spring too long"]);
+    pills.push(st.pre >= 0 ? ["ok", "never slack"] : ["warn", `slack below ${st.slack.toFixed(1)} mm`]);
+    pills.push(st.x <= st.s.sn && st.F <= st.s.Fn ? ["ok", "within rating"] : ["bad", "over rating"]);
+    pills.push(c.d === Infinity || c.d >= 0.0015 ? ["ok", `clear ${c.d === Infinity ? "> 6" : (c.d * 1000).toFixed(1)} mm`]
+                                                 : c.d >= 0 ? ["warn", `${(c.d * 1000).toFixed(1)} mm to ${c.what}`] : ["bad", `hits ${c.what}`]);
+    document.getElementById("sStatus").innerHTML = pills.map(([k, t]) => `<span class="pill ${k}">${t}</span>`).join("");
+  }
+  showMount();
+  buildStatics();
+  cadTable();
+
+  // ---------------------------------------------------------------- toggles, theme, views, hover
+  const bind = (id, fn) => document.getElementById(id).addEventListener("change", (e) => { fn(e.target.checked); render(); });
+  bind("tAxes", (v) => helpers.axes.forEach((h) => (h.visible = v)));
+  bind("tCom", (v) => helpers.com.forEach((h) => (h.visible = v)));
+  bind("tFrames", (v) => helpers.frames.forEach((h) => (h.visible = v)));
+  bind("tGhost", (v) => meshes.forEach((m) => { m.material.transparent = v; m.material.opacity = v ? 0.35 : 1; m.material.depthWrite = !v; m.material.needsUpdate = true; }));
+
+  function applyTheme() {
+    const cs = getComputedStyle(document.documentElement);
+    scene.background = new THREE.Color(cs.getPropertyValue("--stage").trim());
+    if (grid) { scene.remove(grid); grid.geometry.dispose(); }
+    grid = new THREE.GridHelper(0.6, 30, new THREE.Color(cs.getPropertyValue("--grid-major").trim()), new THREE.Color(cs.getPropertyValue("--grid-minor").trim()));
+    grid.position.y = 0.0002; scene.add(grid);
+    const a = accent(); helpers.axes.forEach((h) => h.material.color.copy(a));
+    cableMat.color.copy(new THREE.Color(cs.getPropertyValue("--fg").trim()));
+    render();
+  }
+  try { window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", applyTheme); } catch (e) { /* older browsers */ }
+  new MutationObserver(applyTheme).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+
+  const TARGET = new THREE.Vector3(0.07, 0.12, 0);
+  const SPRING_TARGET = new THREE.Vector3(0.015, 0.095, 0.02);         // the shoulder and upper arm, seen from the spring side
+  const VIEWS = { viewIso: [0.43, 0.33, 0.42], viewFront: [0.62, 0.14, 0.0], viewSide: [0.08, 0.14, 0.62], viewTop: [0.08, 0.72, 0.001],
+                  viewSpring: [0.21, 0.17, 0.37] };
+  function setView(id) {
+    camera.position.fromArray(VIEWS[id]); controls.target.copy(id === "viewSpring" ? SPRING_TARGET : TARGET); controls.update();
+    for (const k of Object.keys(VIEWS)) document.getElementById(k).setAttribute("aria-pressed", String(k === id));
+    render();
+  }
+  for (const k of Object.keys(VIEWS)) document.getElementById(k).addEventListener("click", () => setView(k));
+  controls.addEventListener("change", () => { for (const k of Object.keys(VIEWS)) document.getElementById(k).setAttribute("aria-pressed", "false"); render(); });
+
+  const ray = new THREE.Raycaster(), ptr = new THREE.Vector2(), hoverEl = document.getElementById("hover");
+  let hovered = null, hoverQueued = false, lastEvt = null, dragging = false;
+  renderer.domElement.addEventListener("pointerdown", () => (dragging = true));
+  window.addEventListener("pointerup", () => (dragging = false));
+  renderer.domElement.addEventListener("pointermove", (e) => {
+    lastEvt = e; if (dragging || hoverQueued) return; hoverQueued = true;
+    requestAnimationFrame(() => {
+      hoverQueued = false; const r = renderer.domElement.getBoundingClientRect();
+      ptr.set(((lastEvt.clientX - r.left) / r.width) * 2 - 1, -((lastEvt.clientY - r.top) / r.height) * 2 + 1);
+      ray.setFromCamera(ptr, camera);
+      const hit = ray.intersectObjects(meshes, false)[0];
+      const m = hit ? hit.object : null;
+      if (m !== hovered) {
+        if (hovered) hovered.material.emissive.setHex(0x000000);
+        hovered = m;
+        if (m) { m.material.emissive.copy(accent()).multiplyScalar(0.35); const L = m.userData.link; hoverEl.textContent = `${L.name} · ${(L.mass * 1000).toFixed(1)} g`; }
+        else hoverEl.textContent = "Hover a part to see its name and mass";
+        render();
+      }
+    });
+  });
+
+  let queued = false;
+  function render() { if (queued) return; queued = true; requestAnimationFrame(() => { queued = false; renderer.render(scene, camera); updateLabels(); }); }
+  function resize() {
+    const w = stage.clientWidth, h = stage.clientHeight; if (!w || !h) return;
+    renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); render();
+  }
+  new ResizeObserver(resize).observe(stage);
+
+  ORDER.forEach((n) => setJoint(n, 0));
+  applyTheme(); setView("viewSpring"); resize(); setSpring(springIdx);
+})();
+</script>

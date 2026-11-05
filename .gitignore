@@ -1,0 +1,15 @@
+# build outputs
+firmware/.pio/
+firmware/tools/sim/out/
+__pycache__/
+*.pyc
+# editors
+.vscode/
+firmware/.vscode/
+# generated at build time (tools/build_web.py, run by PlatformIO and tools/sim/build.cmd)
+firmware/src/main/web_assets.h
+# built on demand by tools/build_viewer.py
+firmware/docs/raft_viewer.html
+# design history, kept locally
+firmware/docs/plan.md
+firmware/docs/plan_v2.md

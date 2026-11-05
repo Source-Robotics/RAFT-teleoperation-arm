@@ -161,6 +161,7 @@ table.cad td:first-child { font-family: var(--f-body); }
       <button class="btn" id="viewSide" type="button" aria-pressed="false">Side</button>
       <button class="btn" id="viewTop" type="button" aria-pressed="false">Top</button>
       <button class="btn" id="viewSpring" type="button" aria-pressed="false">Spring</button>
+      <button class="btn" id="viewElbow" type="button" aria-pressed="false">Elbow</button>
     </div>
   </div>
   <div class="stage-foot">
@@ -201,7 +202,7 @@ table.cad td:first-child { font-family: var(--f-body); }
     <h2 id="hGrav">Gravity holding current <small>static, from URDF inertials</small></h2>
     <div class="grav" id="grav"></div>
     <div class="scale"><span></span><div id="scale"></div><span></span></div>
-    <p class="note">Current = torque / Kt with Kt = 0.441 Nm/A (datasheet, unverified on the bench). The tick marks the servo's 350 mA continuous rating; the bar ends at 1000 mA. J1 turns about a vertical axis and never carries gravity. With the spring fitted, J2 shows what the servo still has to supply.</p>
+    <p class="note">Current = torque / Kt with Kt = 0.441 Nm/A (datasheet, unverified on the bench). The tick marks the servo's 350 mA continuous rating; the bar ends at 1000 mA. J1 turns about a vertical axis and never carries gravity. With springs fitted, J2 and J3 show what the servos still have to supply.</p>
   </section>
 
   <section aria-labelledby="hSpring">
@@ -237,6 +238,47 @@ table.cad td:first-child { font-family: var(--f-body); }
     <h2>CAD coordinates <small>mm, standby pose</small></h2>
     <div class="cadwrap"><table class="cad"><thead><tr><th>point</th><th>assembly X Y Z</th><th>part frame</th></tr></thead><tbody id="cadBody"></tbody></table></div>
     <p class="note">Assembly = the SolidWorks assembly's default coordinate system (Y up, Z forward). Part frame: Coordinate System2 sits on the J2 axis (shoulder bracket parts), Coordinate System3 on the J3 axis (upper arm). <span id="springLink"></span></p>
+  </section>
+
+  <section aria-labelledby="hSpring3">
+    <h2 id="hSpring3">J3 counterbalance <small>forearm, two options</small></h2>
+    <div class="chips" id="opt3" role="group" aria-label="J3 spring option">
+      <button class="chip" type="button" data-o="off" aria-pressed="false">None</button>
+      <button class="chip" type="button" data-o="A" aria-pressed="true">A: across the elbow</button>
+      <button class="chip" type="button" data-o="B" aria-pressed="false">B: belt to the shoulder</button>
+    </div>
+    <p class="note" id="opt3Note"></p>
+    <label for="spring3Sel" class="note">Spring</label>
+    <select id="spring3Sel" class="field"></select>
+    <div class="mount" role="group" aria-label="J3 mount dimensions in mm">
+      <label for="nP">anchor p<input id="nP" class="field" type="number" step="0.5"></label>
+      <label for="nQ">eyelet q<input id="nQ" class="field" type="number" step="0.5"></label>
+      <label for="nG">pin g<input id="nG" class="field" type="number" step="0.5"></label>
+      <label for="nZ">plane z<input id="nZ" class="field" type="number" step="0.5"></label>
+      <label for="nBZ">belt z<input id="nBZ" class="field" type="number" step="0.5"></label>
+    </div>
+    <p class="note">mm. <b>p</b>: anchor distance from the J3 axis. <b>q</b>: eyelet distance from the J3 axis, on the arm fixed to the elbow. <b>g</b>: spring pin distance from the eyelet along that arm. <b>z</b>: J3 cable plane (bar outer face at &minus;28.2, J2 cable plane at &minus;33). <b>belt z</b>: belt plane for B. The recommended mount takes p = 10 and q so that rate &times; p &times; q equals the forearm's load: <span id="j3load"></span>.</p>
+    <div class="btnrow">
+      <button class="btn" id="nReset" type="button">Recommended mount</button>
+      <button class="btn" id="sweep3J2" type="button">Sweep J2</button>
+      <button class="btn" id="sweep3J3" type="button">Sweep J3</button>
+    </div>
+    <div class="pills" id="s3Status"></div>
+    <div class="sread">
+      <div class="cell"><span>balance</span><output id="nBal">-</output></div>
+      <div class="cell"><span>anchor-eyelet</span><output id="nPQ">-</output></div>
+      <div class="cell"><span>spring length / room</span><output id="nLen">-</output></div>
+      <div class="cell"><span>stretch / rated</span><output id="nStr">-</output></div>
+      <div class="cell"><span>cable force / rated</span><output id="nF">-</output></div>
+      <div class="cell"><span>nearest part</span><output id="nClr">-</output></div>
+      <div class="cell"><span>J3 without / with</span><output id="nJ3">-</output></div>
+      <div class="cell"><span>J2 without / with</span><output id="nJ2">-</output></div>
+      <div class="cell"><span>pre-stretch at closest</span><output id="nPre">-</output></div>
+    </div>
+    <div class="sweepout" id="sweepOut3">Run a sweep to check the whole joint range.</div>
+    <h2>J3 CAD coordinates <small>mm, standby pose</small></h2>
+    <div class="cadwrap"><table class="cad"><thead><tr><th>point</th><th>assembly X Y Z</th><th>part frame</th></tr></thead><tbody id="cad3Body"></tbody></table></div>
+    <p class="note">CS3 (upper arm): x up the arm from the J3 axis, y backward, z along the J3 axis outward. The elbow's points are given as distance and angle from the J3 axis at the standby pose. "Without / with": the servo current from gravity alone, and with every fitted spring.</p>
   </section>
 
   <section aria-labelledby="hShow">
@@ -475,9 +517,10 @@ const DATA = /*__RAFT_DATA__*/null;
   function update() {
     scene.updateMatrixWorld(true);
     const spst = updateSpring();                      // J2 counterbalance: geometry follows q2, state for the readouts
+    const sp3 = updateSpring3();                      // J3 counterbalance (option A or B), or null
     scene.updateMatrixWorld(true);
     inv.copy(robot.matrixWorld).invert();
-    let j2Gravity = 0, j2Servo = 0;
+    let j2Gravity = 0, j2Servo = 0, j3Gravity = 0, j3Servo = 0;
     // gravity: holding torque = -(axis . sum over distal links of (c - o) x m g)
     const gz = new THREE.Vector3(0, 0, -G);
     for (const n of ORDER.slice(1)) {
@@ -491,8 +534,10 @@ const DATA = /*__RAFT_DATA__*/null;
         mom.add(c.sub(o).cross(gz.clone().multiplyScalar(links[ln].mass)));
       }
       const tauG = -z.dot(mom);
-      const tau = n === "joint2" && spst ? tauG - spst.tau : tauG;   // what the servo still supplies
-      if (n === "joint2") { j2Gravity = tauG; j2Servo = tau; }
+      let tau = tauG;                                   // what the servo still supplies
+      // B's J3 spring is referenced to the shoulder: the same torque that lifts the forearm comes off J2 (opposite axes)
+      if (n === "joint2") { if (spst) tau -= spst.tau; if (sp3 && opt3 === "B") tau += sp3.tau; j2Gravity = tauG; j2Servo = tau; }
+      if (n === "joint3") { if (sp3) tau -= sp3.tau; j3Gravity = tauG; j3Servo = tau; }
       const ma = (1000 * Math.abs(tau)) / KT, r = gRows[n];
       r.fill.style.width = `${Math.min(100, (100 * ma) / BAR_MAX_MA)}%`;
       r.fill.className = "fill" + (ma > 2 * RATED_MA ? " hot" : ma > RATED_MA ? " warn" : "");
@@ -504,6 +549,8 @@ const DATA = /*__RAFT_DATA__*/null;
       out("tx").textContent = (p.x * 1000).toFixed(1); out("ty").textContent = (p.y * 1000).toFixed(1); out("tz").textContent = (p.z * 1000).toFixed(1);
       out("rr").textContent = deg(rpy[0]).toFixed(1) + "°"; out("rp").textContent = deg(rpy[1]).toFixed(1) + "°"; out("ry").textContent = deg(rpy[2]).toFixed(1) + "°";
     }
+    lastTau = { g2: j2Gravity, s2: j2Servo, g3: j3Gravity, s3: j3Servo };
+    lastSt3 = sp3;
     if (spst) {
       lastClear = clearance(spst);
       springReadout(spst, j2Gravity, j2Servo);
@@ -513,6 +560,18 @@ const DATA = /*__RAFT_DATA__*/null;
       pos.setXYZ(0, Mw.x, Mw.y, Mw.z); pos.setXYZ(1, B.x, B.y, B.z); pos.setXYZ(2, A.x, A.y, A.z); pos.needsUpdate = true;
     } else {
       document.getElementById("sStatus").innerHTML = '<span class="pill warn">spring not fitted</span>';
+    }
+    if (sp3) {
+      lastClear3 = clearance3(sp3);
+      spring3Readout(sp3);
+      const P = new THREE.Vector3().setFromMatrixPosition(ptP.matrixWorld), Q = new THREE.Vector3().setFromMatrixPosition(ptQ.matrixWorld);
+      const Mw = new THREE.Vector3().setFromMatrixPosition(ptM3.matrixWorld), pos = cable3.geometry.attributes.position;
+      pos.setXYZ(0, Mw.x, Mw.y, Mw.z); pos.setXYZ(1, Q.x, Q.y, Q.z); pos.setXYZ(2, P.x, P.y, P.z); pos.needsUpdate = true;
+    } else {
+      document.getElementById("s3Status").innerHTML = '<span class="pill warn">no J3 spring</span>';
+      for (const id of ["nBal", "nPQ", "nLen", "nStr", "nF", "nClr", "nPre"]) out(id).textContent = "-";
+      out("nJ3").textContent = `${((1000 * Math.abs(j3Gravity)) / KT).toFixed(0)} mA`;
+      out("nJ2").textContent = `${((1000 * Math.abs(j2Gravity)) / KT).toFixed(0)} / ${((1000 * Math.abs(j2Servo)) / KT).toFixed(0)} mA`;
     }
     render();
   }
@@ -746,7 +805,9 @@ const DATA = /*__RAFT_DATA__*/null;
     sweeping = true;
     const j = jointObj[n], start = deg(j.q);
     let a = lo, worst = { d: Infinity }, maxStr = 0, maxF = 0, tooLong = null, slackAt = null;
-    const out = document.getElementById("sweepOut");
+    let worst3 = { d: Infinity }, maxStr3 = 0, maxF3 = 0, tooLong3 = null, slack3 = null;
+    const pk = { g2: 0, s2: 0, g3: 0, s3: 0 };
+    const out = document.getElementById("sweepOut"), out3 = document.getElementById("sweepOut3");
     const stepFn = () => {
       setJoint(n, a); update();
       const st = springState(jointObj.joint2.q), c = lastClear;
@@ -754,7 +815,17 @@ const DATA = /*__RAFT_DATA__*/null;
       maxStr = Math.max(maxStr, st.x / st.s.sn); maxF = Math.max(maxF, st.F / st.s.Fn);
       if (!st.taut && slackAt === null) slackAt = a;
       if (st.L > st.room && tooLong === null) tooLong = a;
+      for (const k of Object.keys(pk)) pk[k] = Math.max(pk[k], Math.abs(lastTau[k]));
+      const st3 = lastSt3;
+      if (st3) {
+        const c3 = lastClear3;
+        if (c3.d < worst3.d) worst3 = { d: c3.d, what: c3.what, at: a };
+        maxStr3 = Math.max(maxStr3, st3.x / st3.s.sn); maxF3 = Math.max(maxF3, st3.F / st3.s.Fn);
+        if (!st3.taut && slack3 === null) slack3 = a;
+        if (st3.L > st3.room && tooLong3 === null) tooLong3 = a;
+      }
       out.textContent = `${NAMES[n][0]} at ${a.toFixed(0)} deg ...`;
+      out3.textContent = out.textContent;
       a += 2.5;
       if (a <= hi) { requestAnimationFrame(stepFn); return; }
       setJoint(n, start); update(); sweeping = false;
@@ -762,6 +833,13 @@ const DATA = /*__RAFT_DATA__*/null;
       lastSweep = `${NAMES[n][0]} ${lo} to ${hi} deg: nearest ${clr}; stretch <= ${(100 * maxStr).toFixed(0)} % and force <= ${(100 * maxF).toFixed(0)} % of rating` +
         (tooLong !== null ? `; spring too long from ${tooLong.toFixed(0)} deg` : "") + (slackAt !== null ? `; slack at ${slackAt.toFixed(0)} deg` : "");
       out.textContent = lastSweep;
+      const mA = (t) => ((1000 * t) / KT).toFixed(0);
+      const peaks = `Peak servo current, gravity alone / with the springs: J3 ${mA(pk.g3)} / ${mA(pk.s3)} mA, J2 ${mA(pk.g2)} / ${mA(pk.s2)} mA.`;
+      if (opt3 !== "off") {
+        const clr3 = worst3.d === Infinity ? "> 6 mm" : `${(worst3.d * 1000).toFixed(1)} mm (${worst3.what} at ${worst3.at.toFixed(0)} deg)`;
+        out3.textContent = `${NAMES[n][0]} ${lo} to ${hi} deg, option ${opt3}: nearest ${clr3}; stretch <= ${(100 * maxStr3).toFixed(0)} % and force <= ${(100 * maxF3).toFixed(0)} % of rating` +
+          (tooLong3 !== null ? `; spring too long from ${tooLong3.toFixed(0)} deg` : "") + (slack3 !== null ? `; slack at ${slack3.toFixed(0)} deg` : "") + `. ${peaks}`;
+      } else out3.textContent = `${NAMES[n][0]} ${lo} to ${hi} deg, no J3 spring. ${peaks}`;
     };
     stepFn();
   }
@@ -770,12 +848,12 @@ const DATA = /*__RAFT_DATA__*/null;
 
   // labels on the stage
   const labels = [["A anchor", ptA], ["B eyelet", ptB], ["F spring pin", ptF]].map(([t, o]) => {
-    const el = document.createElement("div"); el.className = "lbl"; el.textContent = t; stage.appendChild(el); return { el, o };
+    const el = document.createElement("div"); el.className = "lbl"; el.textContent = t; stage.appendChild(el); return { el, o, show: () => springOn };
   });
   function updateLabels() {
     const w = renderer.domElement.clientWidth, h = renderer.domElement.clientHeight;
-    for (const { el, o } of labels) {
-      if (!springOn) { el.hidden = true; continue; }
+    for (const { el, o, show } of labels) {
+      if (!show()) { el.hidden = true; continue; }
       const p = new THREE.Vector3().setFromMatrixPosition(o.matrixWorld).project(camera);
       el.hidden = p.z > 1;
       el.style.left = `${((p.x + 1) / 2) * w}px`; el.style.top = `${((1 - p.y) / 2) * h}px`;
@@ -815,6 +893,273 @@ const DATA = /*__RAFT_DATA__*/null;
   buildStatics();
   cadTable();
 
+  // ---------------------------------------------------------------- J3 counterbalance: two options to compare
+  // The forearm's load on J3 is M3 sin(psi), psi = the angle of the forearm's centre of mass from straight up. A
+  // zero-length cable spring between an anchor A3 at p from the J3 axis pointing up and an eyelet B3 at q on the elbow
+  // pointing at that centre of mass gives k p q sin(psi): it cancels the load when k p q = M3. Both points are turned by
+  // DELTA3 so B3 sits in the gap the upper arm never sweeps (seen from the elbow); the arm on the elbow that carries the
+  // eyelet, the spring and its pin tilts up (MAST3) to stay clear of the wrist. J3 frame (joint3.frame): x3 up the upper
+  // arm, y3 backward, z3 = -z1 (outward); psi is measured from up toward forward.
+  //   A: A3 on a post at the upper arm's end. "Up" is up the arm, so it is exact only with the upper arm vertical, and J2
+  //      sees nothing (the spring acts between the upper arm and the elbow).
+  //   B: A3 on a lever of a pulley on a free axle at J3, which a 1:1 belt from a pulley fixed on the J2 post keeps level.
+  //      Exact in every pose, and the same torque comes off J2 (the forearm's share of J2's load).
+  const j3c = (() => {                                  // the forearm's centre of mass, elbow frame, zero pose
+    scene.updateMatrixWorld(true);
+    const el = jointObj.joint3.motion, c = new THREE.Vector3();
+    let mt = 0;
+    for (const ln of jointObj.joint3.below) {
+      const w = new THREE.Vector3().fromArray(links[ln].com).applyMatrix4(linkObj[ln].matrixWorld);
+      c.add(el.worldToLocal(w).multiplyScalar(links[ln].mass)); mt += links[ln].mass;
+    }
+    const ux = c.x / mt, uy = c.y / mt;
+    return { mass: mt, M: G * mt * Math.hypot(ux, uy), psi: deg(Math.atan2(-uy, ux)) };
+  })();
+  const DELTA3 = -20, MAST3 = 25, PLATE3_IN = 29.5, PLATE3_OUT = 32.5, ELBOW_FACE = 21.9, BELT_R = 6.4, F_FOR_B = 94;
+  const PSI_Q = j3c.psi + DELTA3;
+  const dirPsi = (psi, r) => [r * Math.cos(rad(psi)), -r * Math.sin(rad(psi))];        // (x3, y3) in mm
+  const U3 = dirPsi(MAST3, 1);
+  function recommended3(i) {                            // p = 10 mm, q from k p q = M3, pin far enough for the longest spring
+    const s = SPRINGS[i], p = 10, slack = s.F0 / s.R;
+    const q = Math.round(2 * Math.min(30, Math.max(p + slack + 2, j3c.M / MM / (s.R * p)))) / 2;
+    return { p, q, g: Math.ceil(EYE_MARGIN + s.L0 + p + q - slack + 2), z: -38, bz: -49 };
+  }
+  let opt3 = "A", spring3Idx = 0, m3 = recommended3(0), savedF = null;
+  const j3 = { up: new THREE.Group(), lever: new THREE.Group(), el: new THREE.Group(), sh: new THREE.Group(), belt: new THREE.Group() };
+  jointObj.joint3.frame.add(j3.up); j3.up.add(j3.lever); jointObj.joint3.motion.add(j3.el);
+  jointObj.joint2.frame.add(j3.sh); jointObj.joint2.motion.add(j3.belt);
+  const ptP = new THREE.Object3D(), ptQ = new THREE.Object3D(), ptF3 = new THREE.Object3D(), ptM3 = new THREE.Object3D();
+  const ptD2 = new THREE.Object3D(), ptD3 = new THREE.Object3D();
+  j3.el.add(ptQ); j3.el.add(ptF3); j3.el.add(ptM3); j3.sh.add(ptD2); j3.up.add(ptD3);
+  const matPart3 = new THREE.MeshStandardMaterial({ color: 0x3d7cc9, roughness: 0.5, metalness: 0.1 });   // J3 parts blue, J2's green
+  const matBelt = new THREE.MeshStandardMaterial({ color: 0x2a2f35, roughness: 0.85, metalness: 0.0 });
+  const cable3Mat = new THREE.LineBasicMaterial({ color: accent() });
+  const cable3 = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()]), cable3Mat);
+  cable3.frustumCulled = false;
+  scene.add(cable3);
+  const ZV = new THREE.Vector3(0, 0, 1), statics3 = [];
+  let spring3Mesh = null, lastClear3 = { d: Infinity, what: "" }, lastSt3 = null, lastTau = { g2: 0, s2: 0, g3: 0, s3: 0 };
+
+  function geom3() {                                    // mm: A3 (its own frame), B3 and F3 (elbow frame), plane z3
+    const m = m3, P = dirPsi(DELTA3, m.p), Q = dirPsi(PSI_Q, m.q);
+    return { m, zl: -m.z, P, Q, F: [Q[0] + m.g * U3[0], Q[1] + m.g * U3[1]] };
+  }
+  function boxAlong(a, b, w, t, z, mat) {               // flat bar from a to b (mm, xy), width w, thickness t, centred at z
+    const len = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(w * MM, len * MM, t * MM), mat);
+    mesh.position.set(((a[0] + b[0]) / 2) * MM, ((a[1] + b[1]) / 2) * MM, z * MM);
+    mesh.rotation.z = Math.atan2(-(b[0] - a[0]), b[1] - a[1]);
+    mesh.castShadow = true;
+    return mesh;
+  }
+  function disc(r, h, z, mat, open = false) {           // cylinder about the local z axis
+    const mesh = new THREE.Mesh(new THREE.CylinderGeometry(r * MM, r * MM, h * MM, 32, 1, open), mat);
+    mesh.rotation.x = Math.PI / 2; mesh.position.z = z * MM; mesh.castShadow = true;
+    return mesh;
+  }
+  function buildStatics3() {
+    for (const o of statics3) { o.parent.remove(o); o.traverse((x) => x.geometry && x.geometry.dispose()); }
+    statics3.length = 0;
+    const add = (parent, o) => { parent.add(o); statics3.push(o); };
+    if (ptP.parent) ptP.parent.remove(ptP);
+    (opt3 === "B" ? j3.lever : j3.up).add(ptP);
+    const vis = opt3 !== "off";
+    for (const g of Object.values(j3)) g.visible = vis;
+    cable3.visible = vis;
+    if (spring3Mesh) spring3Mesh.visible = vis;
+    cadTable3();
+    if (!vis) return;
+    const { m, zl, P, Q, F } = geom3();
+    // elbow: a standoff from the elbow's outer face at the eyelet, a flat arm tilted up, the spring pin at its end
+    add(j3.el, cylBetween([Q[0], Q[1], ELBOW_FACE], [Q[0], Q[1], zl - 1.5], 2.5, matPart3));
+    add(j3.el, boxAlong([Q[0] - 4 * U3[0], Q[1] - 4 * U3[1]], [F[0] + 4 * U3[0], F[1] + 4 * U3[1]], 7, PLATE3_OUT - PLATE3_IN, (PLATE3_IN + PLATE3_OUT) / 2, matPart3));
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(2.0 * MM, 0.6 * MM, 10, 24), matMetal);
+    ring.quaternion.setFromUnitVectors(ZV, new THREE.Vector3(U3[0], U3[1], 0));
+    ring.position.set(Q[0] * MM, Q[1] * MM, zl * MM); add(j3.el, ring);
+    add(j3.el, cylBetween([F[0], F[1], PLATE3_OUT], [F[0], F[1], zl + 2.5], 1.5, matMetal));
+    const knob = new THREE.Mesh(new THREE.SphereGeometry(2.2 * MM, 16, 12), matMetal);
+    knob.position.set(P[0] * MM, P[1] * MM, zl * MM);
+    if (opt3 === "A") {
+      add(j3.up, cylBetween([P[0], P[1], -BAR_FACE], [P[0], P[1], zl], 2.0, matPart3));          // post on the upper arm's end
+      add(j3.up, knob);
+    } else {
+      const zb = -m.bz;                                  // belt plane in the J3 frame
+      add(j3.up, cylBetween([0, 0, -BAR_FACE], [0, 0, zb + 4.5], 2.5, matMetal));             // axle on the upper arm, on the J3 axis
+      add(j3.lever, disc(BELT_R, 7, zb, matPart3));                                            // pulley that the belt keeps level
+      add(j3.lever, disc(3.5, zb - zl - 2, (zb + zl) / 2 - 2.5, matPart3));                    // hub from the lever to the pulley
+      add(j3.lever, cylBetween([0, 0, zl], [P[0], P[1], zl], 1.6, matPart3));                  // lever with the anchor
+      add(j3.lever, knob);
+      add(j3.up, disc(BELT_R + 0.6, 6, zb, matBelt, true));                                    // belt around it
+      // shoulder (frame 1, link1): an axle on the J2 post along the J2 axis with the fixed pulley
+      add(j3.sh, cylBetween([0, 0, mount.z - 2], [0, 0, m.bz - 4.5], 2.5, matMetal));
+      add(j3.sh, disc(BELT_R, 7, m.bz, matPart3));
+      add(j3.sh, disc(BELT_R + 0.6, 6, m.bz, matBelt, true));
+      for (const sx of [-1, 1]) add(j3.belt, boxAlong([sx * (BELT_R + 0.6), 0], [sx * (BELT_R + 0.6), -100], 1.2, 6, m.bz, matBelt));
+    }
+    ptD2.position.set(0, 0, m.bz * MM); ptD3.position.set(0, 0, -m.bz * MM);
+    ptP.position.set(P[0] * MM, P[1] * MM, zl * MM); ptQ.position.set(Q[0] * MM, Q[1] * MM, zl * MM); ptF3.position.set(F[0] * MM, F[1] * MM, zl * MM);
+  }
+  function buildSpring3(L) {                            // along the elbow arm: fixed end at F3, moving end toward B3
+    if (spring3Mesh) { j3.el.remove(spring3Mesh); spring3Mesh.traverse((o) => o.geometry && o.geometry.dispose()); }
+    const s = SPRINGS[spring3Idx], { zl, F } = geom3();
+    const Di = s.De - 2 * s.d, Rm = (s.De - s.d) / 2, turns = Math.max(4, Math.round((s.L0 - 2 * Di) / s.d));
+    const g = new THREE.Group();
+    g.add(new THREE.Mesh(new THREE.TubeGeometry(new Helix(Rm * MM, Di * MM, (L - Di) * MM, turns, zl * MM), Math.min(1200, turns * 12), (s.d / 2) * MM, 5, false), matSpring));
+    for (const y of [Rm, L - Rm]) {
+      const loop = new THREE.Mesh(new THREE.TorusGeometry(Rm * MM, (s.d / 2) * MM, 6, 28), matSpring);
+      loop.position.set(0, y * MM, zl * MM); g.add(loop);
+    }
+    g.position.set(F[0] * MM, F[1] * MM, 0);
+    g.rotation.z = Math.atan2(U3[0], -U3[1]);         // local +y from the pin back toward the eyelet
+    g.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+    spring3Mesh = g;
+    j3.el.add(g);
+  }
+  function springState3() {
+    const s = SPRINGS[spring3Idx], { m, P, Q } = geom3();
+    const rot = (v, a) => [v[0] * Math.cos(a) - v[1] * Math.sin(a), v[0] * Math.sin(a) + v[1] * Math.cos(a)];
+    const Pn = opt3 === "B" ? rot(P, jointObj.joint2.q) : P, Qn = rot(Q, jointObj.joint3.q);   // both in the J3 frame
+    const d = Math.hypot(Pn[0] - Qn[0], Pn[1] - Qn[1]);
+    const slack = s.F0 / s.R, taut = d >= slack, T = taut ? s.R * d : 0, x = Math.max(0, d - slack);
+    return {
+      s, d, slack, taut, x, L: s.L0 + x, F: T, room: m.g - EYE_MARGIN,
+      tau: taut && d > 0 ? (T / d) * (Qn[0] * Pn[1] - Qn[1] * Pn[0]) * MM : 0,     // Nm on the forearm about the J3 axis
+      balance: (s.R * m.p * m.q * MM) / j3c.M, pre: Math.abs(m.q - m.p) - slack, gapPQ: m.q - 3.5 - (m.p + 2.2),
+    };
+  }
+  function updateSpring3() {                            // returns the J3 spring state, or null for no J3 spring
+    if (opt3 === "off") return null;
+    j3.lever.quaternion.setFromAxisAngle(ZV, opt3 === "B" ? jointObj.joint2.q : 0);
+    const st = springState3(), { zl, F } = geom3();
+    buildSpring3(st.L);
+    ptM3.position.set((F[0] - st.L * U3[0]) * MM, (F[1] - st.L * U3[1]) * MM, zl * MM);
+    return st;
+  }
+  function clearance3(st) {
+    const { m, zl, P, Q, F } = geom3(), s = st.s, mid = (PLATE3_IN + PLATE3_OUT) / 2;
+    for (const mesh of meshes) mesh.userData.inv = _inv.copy(mesh.matrixWorld).invert().clone();
+    const items = [
+      ["J3 eyelet standoff", samples(j3.el, [Q[0], Q[1], ELBOW_FACE + 0.5], [Q[0], Q[1], zl], 2.5), ["link3"]],
+      ["J3 arm", samples(j3.el, [Q[0], Q[1], mid], [F[0], F[1], mid], 3.5), ["link3"]],
+      ["J3 spring", samples(j3.el, [F[0], F[1], zl], [F[0] - st.L * U3[0], F[1] - st.L * U3[1], zl], s.De / 2), ["link3"]],
+      ["J3 spring pin", samples(j3.el, [F[0], F[1], PLATE3_OUT], [F[0], F[1], zl + 2.5], 1.5), ["link3"]],
+    ];
+    if (opt3 === "A") items.push(["J3 anchor post", samples(j3.up, [P[0], P[1], -BAR_FACE + 0.5], [P[0], P[1], zl], 2.2), ["link2"]]);
+    else {
+      const zb = -m.bz;
+      items.push(["J3 lever", samples(j3.lever, [0, 0, zl], [P[0], P[1], zl], 2.2), ["link2"]],
+                 ["J3 pulley", samples(j3.up, [0, 0, zb - 3.5], [0, 0, zb + 3.5], BELT_R + 1.2), ["link2"]],
+                 ["J3 axle", samples(j3.up, [0, 0, -BAR_FACE + 0.5], [0, 0, zb], 2.5), ["link2"]],
+                 ["J2 pulley", samples(j3.sh, [0, 0, m.bz - 3.5], [0, 0, m.bz + 3.5], BELT_R + 1.2), ["link1"]],
+                 ["J2 pulley axle", samples(j3.sh, [0, 0, mount.z - 2], [0, 0, m.bz], 2.5), ["link1"]]);
+      for (const sx of [-1, 1]) items.push(["belt", samples(j3.belt, [sx * (BELT_R + 0.6), -BELT_R, m.bz], [sx * (BELT_R + 0.6), -100 + BELT_R, m.bz], 3.0), ["link2"]]);
+    }
+    const A = new THREE.Vector3().setFromMatrixPosition(ptP.matrixWorld), B = new THREE.Vector3().setFromMatrixPosition(ptQ.matrixWorld);
+    const len = A.distanceTo(B), cpts = [];
+    for (let t = 3 * MM; t < len - 3 * MM; t += 1.5 * MM) cpts.push(B.clone().lerp(A, t / len));
+    items.push(["J3 cable", { pts: cpts, r: 0.5 * MM }, []]);
+    let best = { d: Infinity, what: "" };
+    for (const [name, it, skip] of items) {
+      for (const mesh of meshes) {
+        const ln = mesh.userData.link.name;
+        if (skip.includes(ln)) continue;
+        for (const pw of it.pts) {
+          const d = nearestDist(mesh, pw) - it.r;
+          if (d < best.d) best = { d, what: `${name} / ${ln}` };
+        }
+      }
+    }
+    return best;
+  }
+  function spring3Readout(st) {
+    const pct = (x) => `${(100 * x).toFixed(0)} %`, mA = (t) => ((1000 * Math.abs(t)) / KT).toFixed(0);
+    out("nBal").textContent = pct(st.balance);
+    out("nPQ").textContent = `${st.d.toFixed(1)} mm`;
+    out("nLen").textContent = `${st.L.toFixed(1)} / ${st.room.toFixed(0)} mm`;
+    out("nStr").textContent = `${st.x.toFixed(1)} / ${st.s.sn.toFixed(0)} mm`;
+    out("nF").textContent = `${st.F.toFixed(1)} / ${st.s.Fn.toFixed(0)} N`;
+    out("nJ3").textContent = `${mA(lastTau.g3)} / ${mA(lastTau.s3)} mA`;
+    out("nJ2").textContent = `${mA(lastTau.g2)} / ${mA(lastTau.s2)} mA`;
+    out("nPre").textContent = st.pre >= 0 ? `${st.pre.toFixed(1)} mm` : "slack zone";
+    const c = lastClear3;
+    out("nClr").textContent = c.d === Infinity ? "> 6 mm" : `${(c.d * 1000).toFixed(1)} mm`;
+    out("nClr").title = c.what;
+    const pills = [];
+    pills.push(st.L <= st.room ? ["ok", "fits"] : ["bad", "spring too long"]);
+    pills.push(st.pre >= 0 ? ["ok", "never slack"] : ["warn", `slack below ${st.slack.toFixed(1)} mm`]);
+    pills.push(st.x <= st.s.sn && st.F <= st.s.Fn ? ["ok", "within rating"] : ["bad", "over rating"]);
+    pills.push(c.d === Infinity || c.d >= 0.0015 ? ["ok", `clear ${c.d === Infinity ? "> 6" : (c.d * 1000).toFixed(1)} mm`]
+                                                 : c.d >= 0 ? ["warn", `${(c.d * 1000).toFixed(1)} mm to ${c.what}`] : ["bad", `hits ${c.what}`]);
+    if (st.gapPQ < 1) pills.push(["bad", "anchor hits the eyelet arm"]);
+    if (-m3.z - st.s.De / 2 < PLATE3_OUT + 0.5) pills.push(["bad", "spring rubs its arm: plane z further out"]);
+    if (opt3 === "B" && mount.f > F_FOR_B + 1) pills.push(["bad", "J2 spring pin on the J3 axle: pin f 94"]);
+    document.getElementById("s3Status").innerHTML = pills.map(([k, t]) => `<span class="pill ${k}">${t}</span>`).join("");
+  }
+  function cadTable3() {
+    const body = document.getElementById("cad3Body");
+    if (opt3 === "off") { body.innerHTML = ""; return; }
+    const { m, zl, P, Q, F } = geom3(), r1 = (x) => (Math.abs(x) < 0.05 ? 0 : x).toFixed(1);
+    const f1 = (v, z3) => [-v[1], -100 - v[0], -z3];  // J3 frame at the standby pose -> DH frame 1
+    const rows = [
+      ["J3 axis (along X)", [0, -100, 0], "CS3 origin"],
+      ["J3 cable plane", [0, -100, m.z], `CS3 z = ${r1(zl)}`],
+      [opt3 === "A" ? "anchor A3, top of the post (upper arm's end)" : "anchor A3 on the pulley's lever (stays level)", f1(P, zl),
+        opt3 === "A" ? `CS3  ${r1(P[0])}  ${r1(P[1])}  ${r1(zl)}` : `${r1(m.p)} mm from J3, ${-DELTA3}° behind straight up`],
+      ["eyelet B3 (arm on the elbow)", f1(Q, zl), `${r1(m.q)} mm from J3, ${PSI_Q.toFixed(0)}° from up toward forward`],
+      ["spring pin F3 (arm on the elbow)", f1(F, zl), `${r1(Math.hypot(F[0], F[1]))} mm from J3; arm ${MAST3}° from up`],
+      ["elbow arm (3 mm plate)", [0, -100, -PLATE3_IN], `CS3 z = ${PLATE3_IN} .. ${PLATE3_OUT}`],
+    ];
+    if (opt3 === "B") rows.push(["pulley D2, fixed (on the J2 post)", [0, 0, m.bz], `CS2  0  0  ${r1(m.bz)}`],
+                                ["pulley D3, free (axle on the upper arm)", [0, -100, m.bz], `CS3  0  0  ${r1(-m.bz)}`]);
+    body.innerHTML = rows.map(([n, p, loc]) => `<tr><td>${n}</td><td>${fmt3(toAssembly(p))}</td><td>${loc}</td></tr>`).join("");
+  }
+
+  // ---- J3 UI
+  const OPT3_NOTE = {
+    off: "No J3 spring. J3 carries the forearm by itself, and J2 carries the forearm's share of its own load.",
+    A: "<b>A, across the elbow.</b> Anchor A3 on a post at the upper arm's end; eyelet B3, the spring and its pin on an arm fixed to the elbow. Exact with the upper arm vertical, partial when it tilts; J2 is unchanged.",
+    B: "<b>B, referenced to the shoulder.</b> Pulley D2 fixed on the J2 post and pulley D3 on a free axle at J3, joined by a 1:1 belt (for example GT2, 20 teeth), keep D3 level, so anchor A3 on its lever always points up. Exact in every pose, and the forearm's share also comes off J2. The J2 spring pin moves to 94 mm so the axle fits.",
+  };
+  const sel3 = document.getElementById("spring3Sel");
+  let lastSet3 = "";
+  for (const [i, s] of SPRINGS.entries()) {
+    if (s.set !== lastSet3) { const og = document.createElement("optgroup"); og.label = SET_LABEL[s.set].replace(/ \(mount[^)]*\)/, ""); sel3.appendChild(og); lastSet3 = s.set; }
+    const o = document.createElement("option");
+    o.value = String(i);
+    o.textContent = `${s.code}  ${s.R.toFixed(3)} N/mm  ${s.d} x ${s.De} x ${s.L0}`;
+    sel3.lastChild.appendChild(o);
+  }
+  sel3.value = String(spring3Idx);
+  document.getElementById("j3load").textContent = `${(j3c.mass * 1000).toFixed(0)} g, ${j3c.M.toFixed(3)} Nm, centre of mass ${j3c.psi.toFixed(0)}° from straight up`;
+  const nInputs = { p: "nP", q: "nQ", g: "nG", z: "nZ", bz: "nBZ" };
+  function showMount3() {
+    for (const [k, id] of Object.entries(nInputs)) document.getElementById(id).value = m3[k];
+    document.getElementById("nBZ").disabled = opt3 !== "B";
+  }
+  for (const [k, id] of Object.entries(nInputs)) {
+    document.getElementById(id).addEventListener("change", (e) => { const v = Number(e.target.value); if (Number.isFinite(v)) { m3[k] = v; buildStatics3(); update(); } });
+  }
+  document.getElementById("nReset").addEventListener("click", () => { m3 = recommended3(spring3Idx); showMount3(); buildStatics3(); update(); });
+  sel3.addEventListener("change", () => { spring3Idx = Number(sel3.value); m3 = recommended3(spring3Idx); showMount3(); buildStatics3(); update(); });
+  const optBtns = [...document.querySelectorAll("#opt3 [data-o]")];
+  function setOpt3(o) {
+    opt3 = o;
+    optBtns.forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.o === o)));
+    if (o === "B" && mount.f > F_FOR_B) { savedF = mount.f; mount.f = F_FOR_B; showMount(); buildStatics(); }
+    if (o !== "B" && savedF !== null) { mount.f = savedF; savedF = null; showMount(); buildStatics(); }
+    document.getElementById("opt3Note").innerHTML = OPT3_NOTE[o];
+    showMount3(); buildStatics3();
+    document.getElementById("sweepOut3").textContent = "Run a sweep to check the whole joint range.";
+    update();
+  }
+  optBtns.forEach((b) => b.addEventListener("click", () => setOpt3(b.dataset.o)));
+  document.getElementById("sweep3J2").addEventListener("click", () => sweep("joint2", -105, 130));
+  document.getElementById("sweep3J3").addEventListener("click", () => sweep("joint3", -75, 150));
+  for (const [t, o, show] of [["A3 anchor", ptP, () => opt3 !== "off"], ["B3 eyelet", ptQ, () => opt3 !== "off"], ["F3 spring pin", ptF3, () => opt3 !== "off"],
+                              ["D2 pulley", ptD2, () => opt3 === "B"], ["D3 pulley", ptD3, () => opt3 === "B"]]) {
+    const el = document.createElement("div"); el.className = "lbl"; el.textContent = t; stage.appendChild(el); labels.push({ el, o, show });
+  }
+
   // ---------------------------------------------------------------- toggles, theme, views, hover
   const bind = (id, fn) => document.getElementById(id).addEventListener("change", (e) => { fn(e.target.checked); render(); });
   bind("tAxes", (v) => helpers.axes.forEach((h) => (h.visible = v)));
@@ -830,6 +1175,7 @@ const DATA = /*__RAFT_DATA__*/null;
     grid.position.y = 0.0002; scene.add(grid);
     const a = accent(); helpers.axes.forEach((h) => h.material.color.copy(a));
     cableMat.color.copy(new THREE.Color(cs.getPropertyValue("--fg").trim()));
+    cable3Mat.color.copy(new THREE.Color(cs.getPropertyValue("--fg").trim()));
     render();
   }
   try { window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", applyTheme); } catch (e) { /* older browsers */ }
@@ -837,10 +1183,11 @@ const DATA = /*__RAFT_DATA__*/null;
 
   const TARGET = new THREE.Vector3(0.07, 0.12, 0);
   const SPRING_TARGET = new THREE.Vector3(0.015, 0.095, 0.02);         // the shoulder and upper arm, seen from the spring side
+  const ELBOW_TARGET = new THREE.Vector3(0.03, 0.14, 0.035);           // the elbow, seen from the spring side
   const VIEWS = { viewIso: [0.43, 0.33, 0.42], viewFront: [0.62, 0.14, 0.0], viewSide: [0.08, 0.14, 0.62], viewTop: [0.08, 0.72, 0.001],
-                  viewSpring: [0.21, 0.17, 0.37] };
+                  viewSpring: [0.21, 0.17, 0.37], viewElbow: [0.2, 0.25, 0.33] };
   function setView(id) {
-    camera.position.fromArray(VIEWS[id]); controls.target.copy(id === "viewSpring" ? SPRING_TARGET : TARGET); controls.update();
+    camera.position.fromArray(VIEWS[id]); controls.target.copy(id === "viewSpring" ? SPRING_TARGET : id === "viewElbow" ? ELBOW_TARGET : TARGET); controls.update();
     for (const k of Object.keys(VIEWS)) document.getElementById(k).setAttribute("aria-pressed", String(k === id));
     render();
   }
@@ -878,6 +1225,6 @@ const DATA = /*__RAFT_DATA__*/null;
   new ResizeObserver(resize).observe(stage);
 
   ORDER.forEach((n) => setJoint(n, 0));
-  applyTheme(); setView("viewSpring"); resize(); setSpring(springIdx);
+  applyTheme(); setView("viewSpring"); resize(); setOpt3("A"); setSpring(springIdx);
 })();
 </script>

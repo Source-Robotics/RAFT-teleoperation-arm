@@ -62,11 +62,11 @@ ESP32-PoE runs everything on board, with no PC in the loop:
 <p align="center">
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="Photos/render_poses_dark.png">
-  <img src="Photos/render_poses_light.png" alt="RAFT in five poses: standby, handle in front, reach forward, stretched, folded">
+  <img src="Photos/render_poses_light.png" alt="RAFT in five poses: standby, handle in front, reach forward, stretched, rest">
 </picture>
 </p>
 
-Rendered from the arm's MuJoCo model (`raft_description/`) by [`tools/render_gallery.py`](tools/render_gallery.py).
+Rendered from the arm's MuJoCo model by [`tools/render_gallery.py`](tools/render_gallery.py).
 
 ## 📁 What is in here
 
@@ -76,9 +76,9 @@ Rendered from the arm's MuJoCo model (`raft_description/`) by [`tools/render_gal
 | [`BOM.md`](BOM.md) | Bill of materials: servos, screws, electronics, the optional J2 spring |
 | [`Assembly manual/`](Assembly%20manual/) | Assembly, step by step: which servo goes where, wiring |
 | [`firmware/`](firmware/) | ESP32 firmware (PlatformIO, C++), web UI, host tests and simulators, documentation |
-| [`raft_description/`](raft_description/) | URDF, xacro and MuJoCo models with meshes, ROS 2 display launch |
+| [`raft_description`](raft_description/) | the model guide: URDF and MuJoCo downloads, from [robot_descriptions](https://github.com/Source-Robotics/robot_descriptions) |
 | [`examples/`](examples/) | `gravity_comp.py`: the arm floating in MuJoCo |
-| [`tools/`](tools/) | `check_description.py` (runs in CI), `render_media.py`, `render_assembly.py` (the assembly pictures), `render_gallery.py` (the pictures above) |
+| [`tools/`](tools/) | `render_assembly.py` (the assembly pictures), `render_gallery.py` (the pictures above) |
 | [`datasheets/`](datasheets/) | ESP32-PoE, HLS3606, TTLinker |
 
 ## ⚒️How to build ?
@@ -107,16 +107,21 @@ See [`BOM.md`](BOM.md).
 | [PAR6 link test](firmware/docs/rcb_link_test.md) | Checking the link to PAR6's RCB runtime before the arm moves anything |
 | [J2 spring](firmware/docs/spring_mount.md) | The optional counterbalance for the shoulder |
 | [Firmware](firmware/README.md) | Building, flashing over USB or the network, tests |
-| [Robot description](raft_description/README.md) | URDF, xacro, MuJoCo, ROS 2 |
+| [Robot models](raft_description/README.md) | MuJoCo and URDF downloads, ROS 2, joint ranges, colours (in robot_descriptions) |
 | [Changelog](CHANGELOG.md) | What each version changed |
 
 Try the model without hardware:
 
 ```bash
 pip install mujoco
-python -m mujoco.viewer --mjcf=raft_description/mjcf/scene.xml
+python -m mujoco.viewer --mjcf=firmware/tools/sim/model/scene.xml
 python examples/gravity_comp.py
 ```
+
+The published MuJoCo and URDF models, with ROS 2 support, are in
+[robot_descriptions](https://github.com/Source-Robotics/robot_descriptions): see the [model guide](raft_description/README.md). They are built from
+`firmware/tools/sim/model/raft_reference.json`, which the firmware's model generator writes next to the simulators'
+model.
 
 ## Specifications
 
@@ -148,7 +153,8 @@ python examples/gravity_comp.py
 
 | What | Licence |
 |---|---|
-| Hardware: STEP and 3D print files, the robot description (`raft_description/`), BOM, photos | [CERN-OHL-S-2.0](LICENSE) |
+| Hardware: STEP and 3D print files, BOM, photos | [CERN-OHL-S-2.0](LICENSE) |
+| The robot models, in [robot_descriptions](https://github.com/Source-Robotics/robot_descriptions) like Source Robotics' other models | CC BY 4.0 (their ROS launch and CMake code Apache-2.0) |
 | Software: `firmware/`, `tools/`, `examples/` | [GPL-3.0](LICENSE-GPL-3.0) |
 | The Feetech servo driver bundled in `firmware/src/` (`HLSCL`, `SCS`, `SCSCL`, `SMS_STS`, `SCSerial`, `INST.h`, `SCServo.h`), from [FTServo_Arduino](https://github.com/ftservo/FTServo_Arduino), unchanged | [MIT](firmware/src/LICENSE-FTServo.txt), © 2024 ftservo |
 | The pictures in `BOM reference images/` (vendor photos and Wikimedia Commons) | Each its own, listed in [`BOM reference images/README.md`](BOM%20reference%20images/README.md) |

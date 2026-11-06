@@ -5,15 +5,15 @@ Sources of truth
   * Mass properties from RAFT inertials.pdf p.2-8 (SolidWorks, corrected masses), given in the
     assembly's "default" coordinate system at the CAD zero pose
   * The SW2URDF export (tools/cad/Assem1.SLDASM.urdf), only for the mesh file names and the gripper hinge
-    transform; its STL meshes are raft_description/meshes (lowercase names), or tools/cad/meshes after a new export
+    transform; its STL meshes are tools/sim/model/meshes (lowercase names), or tools/cad/meshes after a new export
 
 Outputs
   * a corrected URDF (joint axes, joint origins, limits, PDF inertials, meshes re-homed)
   * src/main/raft_model.h   : DH table + link inertials in DH link frames (SI, float)
   * src/main/golden_vectors.h: random q -> FK + gravity torque, for the firmware boot self-test
   * the model for the simulators: tools/sim/model (RAFT.urdf, RAFT.xml, scene.xml, follower_scene.xml)
-  * the public description package raft_description/ (urdf, xacro macro, mjcf with collision geoms, meshes); its
-    README, package.xml, launch and rviz files are hand-written. Check it with tools/check_description.py.
+  * tools/sim/model/raft_reference.json: the model reference robot_descriptions builds RAFT's public MuJoCo and
+    URDF packages from (section 10)
   * a sizing printout (which poses load J2/J3 how much)
 """
 import re
@@ -286,7 +286,7 @@ print("arm COM (links 1-7 + base) at zero, DH base frame (mm):",
 #    carries DH frame 6 so simulators report the same TCP as the firmware.
 # --------------------------------------------------------------------------------------
 def fmt(v): return " ".join(f"{x:.12g}" for x in np.where(np.abs(v) < 1e-12, 0.0, v))
-def write_urdf(path, mesh_prefix="../../../../raft_description/meshes/", ext=".stl", header=None, extra=(), named=False):
+def write_urdf(path, mesh_prefix="meshes/", ext=".stl", header=None, extra=(), named=False):
     L = []
     L.append('<?xml version="1.0" encoding="utf-8"?>')
     L += header or [
@@ -323,7 +323,7 @@ def write_urdf(path, mesh_prefix="../../../../raft_description/meshes/", ext=".s
         if jtype == "revolute":
             L.append(f'    <axis xyz="{axis}"/>')
             lo, hi, eff, vel = limit
-            L.append(f'    <limit lower="{lo:.6g}" upper="{hi:.6g}" effort="{eff:.6g}" velocity="{vel:.6g}"/>')
+            L.append(f'    <limit lower="{lo:.12g}" upper="{hi:.12g}" effort="{eff:.6g}" velocity="{vel:.6g}"/>')
         L.append('  </joint>')
 
     link_xml("base_link", base["m"], base["r"], base["I"], [("base_link", np.eye(4))])
@@ -412,18 +412,19 @@ SERVO_ARMATURE, SERVO_FRICTION, SERVO_DAMPING = 0.003, 0.02, 0.01
 # stiffness 0 (no effect); the simulator sets the stiffness when it tests a spring. Placeholder geometry.
 SPRING_A, SPRING_B = 0.013, 0.020          # anchor height above J2, eyelet distance up the arm (plan 4.4, layout v2)
 SPRING_Z = -0.033                           # cable plane along the J2 axis (DH frame 1 z), 4.8 mm outside the bar's outer face
-# Joint ranges: J2 and J3 estimated from part-to-part collisions of the CAD meshes (convex hulls of the
-# non-watertight parts, so slightly conservative; J3 at q2 = 0); the others are placeholders until measured (P1).
-JOINT_LIMITS = [(-pi, pi), (np.deg2rad(-105), np.deg2rad(130)), (np.deg2rad(-75), np.deg2rad(150)),
+# Joint ranges of the simulators' model: the firmware's design ranges (control.cpp, the MOVE clamps until calib_range
+# measures an arm's own), except J3's lower end, which is the measured -80.33 deg (the forearm lying limp on the upper
+# arm, 2026-11-06), so the rest pose (J3 -80, reached by an unclamped move) lies inside it. The trigger keeps +-90 deg:
+# the bilateral simulator squeezes it positive. The published models carry the physical ranges (PUB_LIMITS, section 10).
+JOINT_LIMITS = [(-pi, pi), (np.deg2rad(-105), np.deg2rad(130)), (np.deg2rad(-80.33), np.deg2rad(150)),
                 (-pi, pi), (-pi, pi), (-pi, pi), (-pi / 2, pi / 2)]
 STALL_NM = 6.0 * 0.0980665
+SERVO_SPEED = 6.0                           # rad/s for the URDF velocity limit, below the servo's no-load speed
+# The firmware's rest pose (src/main/control.cpp): the arm lying back the way it rests limp, J2 2 deg short of its stop
+REST_Q = np.array([0, np.deg2rad(-82), np.deg2rad(-80), 0, 0, 0, 0])
 LINK_RGBA = {"base_link": "0.35 0.40 0.45 1", "link1": "0.48 0.53 0.58 1", "link2": "0.65 0.69 0.73 1",
              "link3": "0.38 0.50 0.60 1", "link4": "0.60 0.65 0.69 1", "link5": "0.44 0.52 0.60 1",
              "link6": "0.69 0.73 0.76 1", "gripper_trigger": "0.78 0.31 0.10 1"}
-# Public MJCF only. Keyframes must clear the table (the base plate's underside is z = 0): the firmware's rest pose
-# (forearm 70 deg down) puts the handle 19 mm below it, so the public model folds to 50 deg (handle 18 mm above).
-RELEASE_KEYS = [("standby", np.zeros(7)), ("handle_in_front", arm_pose(20, 20)), ("reach_forward", arm_pose(45, 0)),
-                ("stretched", arm_pose(90, 0)), ("folded", arm_pose(0, 50))]
 # convex-hull pairs that touch in normal poses (3000 random poses: base/link1 always, wrist pairs 17-33 %)
 RELEASE_EXCLUDES = [("base_link", "link1"), ("link4", "link6"), ("link4", "gripper_trigger"), ("link5", "gripper_trigger")]
 
@@ -443,9 +444,9 @@ def R_to_quat(R):
     return q if q[0] >= 0 else -q
 
 
-def write_mjcf(robot_path, scene_path, release=False, meshdir="../meshes"):
-    """release=True writes the public raft_description variant: lowercase mesh files, separate visual and
-    collision geoms, no tcp_probe, no follower scene, keyframes that clear the table."""
+def write_mjcf(robot_path, scene_path, meshdir="meshes"):
+    """the simulators' MJCF (CAD link names, one mesh per link), its scene and the bilateral simulator's follower scene;
+    the public packages are built in robot_descriptions from tools/sim/model/raft_reference.json (section 10)"""
     A0 = [dh_A(off, d, a, al) for (d, a, al, off) in DH]
     def at(T): return f'pos="{fmt(T[:3, 3])}" quat="{fmt(R_to_quat(T[:3, :3]))}"'
     def inertial(m, r, I):
@@ -453,39 +454,22 @@ def write_mjcf(robot_path, scene_path, release=False, meshdir="../meshes"):
         return (f'<inertial pos="{fmt(r)}" mass="{m:.6g}" fullinertia="{I[0,0]:.6g} {I[1,1]:.6g} {I[2,2]:.6g} '
                 f'{I[0,1]:.6g} {I[0,2]:.6g} {I[1,2]:.6g}"/>')
     def geoms(ind, n, pose=""):
-        if not release:
-            return [f'{ind}<geom mesh="{n}" material="{n}"{pose}/>']
-        return [f'{ind}<geom class="visual" mesh="{n}" material="{n}"{pose}/>', f'{ind}<geom class="collision" mesh="{n}"{pose}/>']
-    if release:
-        head = ['  <!-- RAFT leader arm (raft_description). GENERATED by tools/gen_model.py from the CM6 DH table, the RAFT',
-                '       link lengths and the SolidWorks mass properties. Do not hand-edit; see ../README.md.',
-                '       Body i frame = DH frame i-1, joint i turns about its z; qpos = 0 is the standby pose (= PAR6 standby).',
-                '       PAR6/RCB DH angles: theta = q + [0, -pi/2, pi, 0, 0, pi], not wrapped. Actuators take output torque in Nm.',
+        return [f'{ind}<geom mesh="{n}" material="{n}"{pose}/>']
+    head = ['  <!-- RAFT leader arm. GENERATED by firmware/tools/gen_model.py from the CM6 DH table, the RAFT',
+            '       link lengths and the SolidWorks mass properties in RAFT inertials.pdf. Do not hand-edit.',
+            '       Body i frame = DH frame i-1, joint i turns about its z; qpos = 0 is the CAD / PAR6 standby pose.',
+            '       PAR6/RCB DH angles: theta = q + [0, -pi/2, pi, 0, 0, pi]. Actuators take output torque in Nm.',
                 f'       Servo armature {SERVO_ARMATURE}, frictionloss {SERVO_FRICTION}, damping {SERVO_DAMPING} are ESTIMATES, not measured.',
-                '       Ranges: J2 and J3 from CAD collision checks; J1 and J4-J6 are +-180 deg placeholders until measured.',
-                '       Collision geoms are the meshes\' convex hulls (class "collision", group 3). -->']
-        geom_default = ['      <default class="visual">',
-                        '        <geom type="mesh" contype="0" conaffinity="0" group="2"/>',
-                        '      </default>',
-                        '      <default class="collision">',
-                        '        <geom type="mesh" group="3"/>',
-                        '      </default>']
-    else:
-        head = ['  <!-- RAFT leader arm. GENERATED by firmware/tools/gen_model.py from the CM6 DH table, the RAFT',
-                '       link lengths and the SolidWorks mass properties in RAFT inertials.pdf. Do not hand-edit.',
-                '       Body i frame = DH frame i-1, joint i turns about its z; qpos = 0 is the CAD / PAR6 standby pose.',
-                '       PAR6/RCB DH angles: theta = q + [0, -pi/2, pi, 0, 0, pi]. Actuators take output torque in Nm.',
-                f'       Servo armature {SERVO_ARMATURE}, frictionloss {SERVO_FRICTION}, damping {SERVO_DAMPING} are ESTIMATES, not measured.',
-                '       Joint ranges are placeholders until measured. -->']
-        geom_default = ['      <geom type="mesh" contype="0" conaffinity="0" group="2"/>']
+            '       Joint ranges are the firmware\'s design ranges (control.cpp); the measured ones are in raft_reference.json. -->']
+    geom_default = ['      <geom type="mesh" contype="0" conaffinity="0" group="2"/>']
     X = ['<mujoco model="RAFT">'] + head + [
          f'  <compiler angle="radian" meshdir="{meshdir}" autolimits="true" inertiafromgeom="false"/>',
          '  <option timestep="0.001" integrator="implicitfast"/>',
          '  <default>',
          '    <default class="raft">',
          f'      <joint axis="0 0 1" armature="{SERVO_ARMATURE}" frictionloss="{SERVO_FRICTION}" damping="{SERVO_DAMPING}"/>',
-         f'      <motor ctrlrange="{-STALL_NM:.4f} {STALL_NM:.4f}"/>'] + (geom_default if not release else []) + [
-         '      <site group="3" size="0.004" rgba="0.9 0.2 0.1 1"/>'] + (geom_default if release else []) + [
+         f'      <motor ctrlrange="{-STALL_NM:.4f} {STALL_NM:.4f}"/>'] + geom_default + [
+         '      <site group="3" size="0.004" rgba="0.9 0.2 0.1 1"/>',
          '    </default>',
          '  </default>',
          '  <asset>']
@@ -513,8 +497,7 @@ def write_mjcf(robot_path, scene_path, release=False, meshdir="../meshes"):
     X.append(f'{ind}<site name="tcp" {at(A0[5])}/>')
     # contact probe at the TCP: collides only with geoms that set conaffinity bit 2 (the follower
     # scene's obstacle), so it changes nothing in the leader scene
-    if not release:
-        X.append(f'{ind}<geom name="tcp_probe" type="sphere" size="0.01" pos="{fmt(A0[5][:3, 3])}" contype="2" conaffinity="0" group="4" rgba="1 0.5 0 0.3"/>')
+    X.append(f'{ind}<geom name="tcp_probe" type="sphere" size="0.01" pos="{fmt(A0[5][:3, 3])}" contype="2" conaffinity="0" group="4" rgba="1 0.5 0 0.3"/>')
     X.append(f'{ind}<body name="gripper_trigger" {at(A0[5] @ T_6H)}>')
     X.append(f'{ind}  {inertial(links[6]["m"], links[6]["r"], links[6]["I"])}')
     X.append(f'{ind}  <joint name="gripper_trigger_joint" range="{-pi/2:.6f} {pi/2:.6f}"/>')
@@ -523,13 +506,8 @@ def write_mjcf(robot_path, scene_path, release=False, meshdir="../meshes"):
     for _ in range(6):
         ind = ind[:-2]; X.append(f'{ind}</body>')
     X += ['    </body>', '  </worldbody>']
-    if release:
-        # hulls that overlap where the real parts do not: the base and the shoulder share the J1 bearing, and
-        # the wrist pairs touch at J5 angles the real wrist reaches (its range is not measured yet)
-        X += ['  <contact>'] + [f'    <exclude body1="{a}" body2="{b}"/>' for a, b in RELEASE_EXCLUDES] + ['  </contact>']
     X += ['  <tendon>',
-          '    <!-- optional J2 counterbalance (zero-length spring), stiffness 0 = not fitted -->' if not release else
-          '    <!-- optional J2 counterbalance (zero-length cable spring, docs: spring_mount.md); stiffness = spring rate in N/m, 0 = not fitted -->',
+          '    <!-- optional J2 counterbalance (zero-length spring), stiffness 0 = not fitted -->',
           '    <spatial name="j2_spring" stiffness="0" springlength="0 0" width="0.0012" rgba="0.95 0.75 0.1 1" group="3">',
           '      <site site="j2_spring_anchor"/>',
           '      <site site="j2_spring_pin"/>',
@@ -543,8 +521,8 @@ def write_mjcf(robot_path, scene_path, release=False, meshdir="../meshes"):
           '    <framequat name="tcp_quat" objtype="site" objname="tcp"/>',
           '  </sensor>', '  <keyframe>']
     KEYS = [("standby", np.zeros(7)), ("handle_in_front", arm_pose(20, 20)), ("reach_forward", arm_pose(45, 0)),
-            ("stretched", arm_pose(90, 0)), ("rest", arm_pose(0, 70))]          # forearm 70 deg down: lowest reachable fold
-    for name, q in (RELEASE_KEYS if release else KEYS):
+            ("stretched", arm_pose(90, 0)), ("rest", REST_Q)]                   # the firmware's rest pose (control.cpp)
+    for name, q in KEYS:
         X.append(f'    <key name="{name}" qpos="{fmt(q)}"/>')
     X += ['  </keyframe>', '</mujoco>']
     open(robot_path, "w", encoding="utf-8").write("\n".join(X) + "\n")
@@ -568,8 +546,6 @@ def write_mjcf(robot_path, scene_path, release=False, meshdir="../meshes"):
          '  </worldbody>',
          '</mujoco>']
     open(scene_path, "w", encoding="utf-8").write("\n".join(S) + "\n")
-    if release:
-        return
 
     # follower scene for the bilateral simulator: same arm plus a block in front of the standby TCP
     # (top 40 mm below it), which only the TCP probe can touch
@@ -671,75 +647,131 @@ def write_headers(model_h, golden_h, n_vec=40):
 
 
 # --------------------------------------------------------------------------------------
-# 10. Public description package (raft_description/): the same model with lowercase mesh files and
-#     package:// paths, a xacro macro for scenes with several robots, and the MJCF with collision geoms.
-#     The package's hand-written files (README, package.xml, launch, rviz, raft.urdf.xacro) are not touched.
+# 10. Model reference for robot_descriptions. RAFT's public MuJoCo and URDF packages are built and published in
+#     https://github.com/Source-Robotics/robot_descriptions (mujoco/raft, urdf/raft_description), like PAR6's and
+#     PAROL6's. That build needs no RAFT checkout: it imports this file and the CAD meshes once
+#     (robot_descriptions/tools/import_raft_reference.py) and builds from the committed copy.
+#     tools/sim/model/raft_reference.json carries, with the robot_descriptions names (shoulder_link .. wrist_3_link,
+#     base_joint .. wrist_3_joint, trigger_joint, tcp): every link's mass properties and mesh pose, every joint's
+#     origin and physical range, the TCP, the actuation estimates, the J2 spring sites, the contact exclusions, the
+#     keyframes, and sample poses with their FK and gravity torques for the importer's checks.
 # --------------------------------------------------------------------------------------
-def write_macro(urdf_path, macro_path):
-    """raft_macro.xacro: the links and joints of raft.urdf inside a macro; every link, joint and material name
-    gets ${prefix}, and a non-empty `parent` adds a fixed joint parent -> base_link."""
-    lines = Path(urdf_path).read_text(encoding="utf-8").splitlines()
-    body = lines[lines.index('<robot name="RAFT">') + 1:lines.index('</robot>')]
-    body = [l for l in body if "<mujoco>" not in l and "lets MuJoCo" not in l]
-    body = [re.sub(r'(<(?:link|joint|material) name="|<(?:parent|child) link=")', r'\1${prefix}', l) for l in body]
-    X = ['<?xml version="1.0" encoding="utf-8"?>',
-         '<!-- RAFT leader arm as a xacro macro (raft_description). GENERATED by tools/gen_model.py, do not hand-edit.',
-         '     Same links, joints and numbers as raft.urdf, with every link, joint and material name prefixed.',
-         '     Use:  <xacro:include filename="$(find raft_description)/urdf/raft_macro.xacro"/>',
-         '           <xacro:raft prefix="leader_" parent="world" xyz="0 0 0" rpy="0 0 0"/>',
-         '     With parent left empty, base_link is the root link. -->',
-         '<robot xmlns:xacro="http://www.ros.org/wiki/xacro">',
-         "  <xacro:macro name=\"raft\" params=\"prefix:='' parent:='' xyz:='0 0 0' rpy:='0 0 0'\">",
-         "    <xacro:if value=\"${parent != ''}\">",
-         '      <joint name="${prefix}mount_joint" type="fixed">',
-         '        <parent link="${parent}"/>',
-         '        <child link="${prefix}base_link"/>',
-         '        <origin xyz="${xyz}" rpy="${rpy}"/>',
-         '      </joint>',
-         '    </xacro:if>']
-    X += ["  " + l for l in body]
-    X += ['  </xacro:macro>', '</robot>']
-    Path(macro_path).write_text("\n".join(X) + "\n", encoding="utf-8")
+import hashlib
+import json
+REFERENCE_VERSION = 1
+CAD2PUB = {"base_link": "base_link", "link1": "shoulder_link", "link2": "upper_arm_link", "link3": "forearm_link",
+           "link4": "wrist_1_link", "link5": "wrist_2_link", "link6": "wrist_3_link", "gripper_trigger": "trigger_link"}
+PUB_JOINTS = ["base_joint", "shoulder_joint", "elbow_joint", "wrist_1_joint", "wrist_2_joint", "wrist_3_joint", "trigger_joint"]
+# Physical joint ranges (deg). One end of every joint is its mechanical stop measured on the first arm (kStopDeg,
+# firmware/src/main/arm_design.h, 2026-11-02); the other end comes from a CAD sweep (one joint turned, the others at 0,
+# until its parts come within 0.5 mm of the parts it turns against). The sweeps agree with the measured stops to
+# 0.3-2.2 deg (J4: 4.6 deg early). J3's lower end was read on the arm lying limp (2026-11-06). Trigger: 0 = flush
+# against the handle in the CAD (turning positive goes into the handle), its stop 39.63 deg open from there.
+_STOP = [-136.28, -83.96, 92.81, -158.56, 119.72, 149.37, 39.63]
+PUB_LIMITS_DEG = [(_STOP[0], -_STOP[0]), (_STOP[1], 131.5), (-80.33, _STOP[2]), (_STOP[3], 153.5), (-126.0, _STOP[4]),
+                  (-147.5, _STOP[5]), (-_STOP[6], 0.0)]
+PUB_LIMITS = [(np.deg2rad(lo), np.deg2rad(hi)) for lo, hi in PUB_LIMITS_DEG]
+LIMIT_SOURCE = ["lower: measured stop; upper: the same angle mirrored (the CAD has no J1 stop; not measured)",
+                "lower: measured stop (CAD sweep -83.0); upper: CAD sweep",
+                "lower: measured, the forearm lying limp on the upper arm (the CAD parts meet at about -77); upper: measured stop (CAD sweep 92.5)",
+                "lower: measured stop (CAD sweep -154.0); upper: CAD sweep",
+                "lower: CAD sweep; upper: measured stop (CAD sweep 117.5)",
+                "lower: CAD sweep; upper: measured stop (CAD sweep 147.5)",
+                "lower: measured stop, trigger released; upper: trigger flush against the handle (CAD)"]
+PUB_KEYS = [("home", np.zeros(7)), ("parked", REST_Q), ("handle_in_front", arm_pose(20, 20)),
+            ("reach_forward", arm_pose(45, 0)), ("stretched", arm_pose(90, 0))]
+PUB_EXCLUDES = [tuple(CAD2PUB[n] for n in pair) for pair in RELEASE_EXCLUDES]
 
 
-def write_release(root):
-    root = Path(root)
-    for sub in ("urdf", "mjcf", "meshes"):
-        (root / sub).mkdir(parents=True, exist_ok=True)
-    # a new SolidWorks export brings its meshes in tools/cad/meshes (upper-case .STL); without one, the meshes
-    # already in raft_description/meshes stay as they are
-    mesh_src = _CAD / "meshes"
-    if mesh_src.is_dir():
-        for n in ["base_link"] + NAMES:
-            shutil.copyfile(mesh_src / f"{n}.STL", root / "meshes" / f"{n}.stl")
-    header = ['<!-- RAFT leader arm (raft_description). GENERATED by tools/gen_model.py from the CM6 DH table, the RAFT link',
-              '     lengths and the SolidWorks mass properties. Do not hand-edit; see ../README.md.',
-              '     Link i frame = DH frame i-1 and joint i turns about its z axis; q = 0 is the standby pose (= PAR6 standby).',
-              '     PAR6 / RCB DH angles: theta = q + [0, -pi/2, pi, 0, 0, pi], not wrapped. Effort = servo stall torque.',
-              '     Limits: J2 and J3 from CAD collision checks; J1 and J4-J6 are +-180 deg placeholders until measured. -->']
-    urdf = root / "urdf" / "raft.urdf"
-    write_urdf(str(urdf), mesh_prefix="package://raft_description/meshes/", ext=".stl", header=header,
-               extra=['  <!-- lets MuJoCo load this file directly; it drops the package:// part of mesh paths -->',
-                      '  <mujoco><compiler meshdir="../meshes/" fusestatic="false"/></mujoco>'], named=True)
-    print("  ", urdf); check_urdf(str(urdf))
-    write_macro(urdf, root / "urdf" / "raft_macro.xacro"); print("  ", root / "urdf" / "raft_macro.xacro")
-    write_mjcf(str(root / "mjcf" / "raft.xml"), str(root / "mjcf" / "scene.xml"), release=True)
-    print("  ", root / "mjcf" / "raft.xml"); print("  ", root / "mjcf" / "scene.xml"); check_mjcf(str(root / "mjcf" / "scene.xml"))
-    print("  ", root / "meshes", f"({len(NAMES) + 1} STL files)")
+def public_links():
+    """(public name, mass, COM, inertia about the COM, mesh pose) in each link's own frame, base to trigger"""
+    A0 = [dh_A(off, d, a, al) for (d, a, al, off) in DH]
+    out = [("base_link", base["m"], base["r"], base["I"], np.eye(4))]
+    for i in range(6):
+        Ai = A0[i]
+        out.append((CAD2PUB[NAMES[i]], links[i]["m"], Ai[:3, :3] @ links[i]["r"] + Ai[:3, 3],
+                    Ai[:3, :3] @ links[i]["I"] @ Ai[:3, :3].T, Ai))
+    out.append(("trigger_link", links[6]["m"], links[6]["r"], links[6]["I"], np.eye(4)))
+    return out
+
+
+def _pose(T):
+    """a frame as both formats write it: MuJoCo pos/quat (w x y z) and URDF xyz/rpy"""
+    clean = lambda v: [0.0 if abs(x) < 1e-15 else float(x) for x in v]
+    return {"pos": clean(T[:3, 3]), "quat": clean(R_to_quat(T[:3, :3])), "rpy": clean(R_to_rpy(T[:3, :3]))}
+
+
+def write_reference(path, mesh_dir):
+    A0 = [dh_A(off, d, a, al) for (d, a, al, off) in DH]
+    chain = ["base_link"] + [CAD2PUB[n] for n in NAMES[:6]]
+    link_rows = []
+    for name, m, r, I, Tm in public_links():
+        cad = next(k for k, v in CAD2PUB.items() if v == name)
+        mesh = Path(mesh_dir) / f"{cad}.stl"
+        link_rows.append({"name": name, "mass": float(m), "com": [float(x) for x in r],
+                          "inertia": {"ixx": float(I[0, 0]), "iyy": float(I[1, 1]), "izz": float(I[2, 2]),
+                                      "ixy": float(I[0, 1]), "ixz": float(I[0, 2]), "iyz": float(I[1, 2])},
+                          "mesh": {"cad_file": mesh.name, "sha256": hashlib.sha256(mesh.read_bytes()).hexdigest(),
+                                   "origin": _pose(Tm)}})
+    joint_rows = []
+    for i in range(7):
+        parent, child = (chain[i], chain[i + 1]) if i < 6 else ("wrist_3_link", "trigger_link")
+        T = (np.eye(4) if i == 0 else A0[i - 1]) if i < 6 else A0[5] @ T_6H
+        joint_rows.append({"name": PUB_JOINTS[i], "parent": parent, "child": child, "origin": _pose(T),
+                           "axis": [0.0, 0.0, 1.0], "range": [float(PUB_LIMITS[i][0]), float(PUB_LIMITS[i][1])],
+                           "range_deg": [float(x) for x in PUB_LIMITS_DEG[i]], "range_source": LIMIT_SOURCE[i],
+                           "measured_stop_deg": _STOP[i]})
+    samples = []
+    srng = np.random.default_rng(11)
+    for _ in range(40):
+        q = np.concatenate([srng.uniform([lo for lo, _ in PUB_LIMITS[:6]], [hi for _, hi in PUB_LIMITS[:6]]),
+                            [srng.uniform(*PUB_LIMITS[6])]])
+        F = frames(q)
+        samples.append({"q": [float(x) for x in q], "tcp": [[float(x) for x in row] for row in F[6]],
+                        "trigger_link": [[float(x) for x in row] for row in F[7]],
+                        "gravity_torque": [float(x) for x in tau_g(q)]})
+    total = base["m"] + sum(L["m"] for L in links)
+    ref = {
+        "schema_version": REFERENCE_VERSION, "robot": "raft",
+        "generator": "RAFT-teleoperation-arm: firmware/tools/gen_model.py",
+        "units": "metres, kilograms, radians (range_deg: degrees), newton metres",
+        "conventions": "link i frame = DH frame i-1, joint i turns about its z axis; q = 0 is the standby pose "
+                       "(PAR6's standby pose); PAR6/RCB DH angles theta = q + theta_offset, not wrapped",
+        "dh": {"d": [float(r[0]) for r in DH], "a": [float(r[1]) for r in DH], "alpha": [float(r[2]) for r in DH],
+               "theta_offset": [float(r[3]) for r in DH]},
+        "links": link_rows, "joints": joint_rows,
+        "tcp": {"parent": "wrist_3_link", "origin": _pose(A0[5])},
+        "actuation": {"stall_torque_nm": float(STALL_NM), "speed_rad_s": float(SERVO_SPEED),
+                      "armature": SERVO_ARMATURE, "frictionloss": SERVO_FRICTION, "damping": SERVO_DAMPING,
+                      "servo": "Feetech HLS3606M, current mode", "note": "armature, friction and damping are estimates, not measured"},
+        "j2_spring": {"anchor": {"body": "shoulder_link", "pos": [float(x) for x in (A0[0] @ [0, -SPRING_A, SPRING_Z, 1])[:3]]},
+                      "pin": {"body": "upper_arm_link", "pos": [float(x) for x in (A0[1] @ [-A3 + SPRING_B, 0, -SPRING_Z, 1])[:3]]},
+                      "note": "zero-free-length cable spring; the model's tendon stiffness 0 = not fitted"},
+        "contact_excludes": [list(p) for p in PUB_EXCLUDES],
+        "keyframes": [{"name": n, "qpos": [float(x) for x in q]} for n, q in PUB_KEYS],
+        "checks": {"mass_total": float(total), "mass_moving": float(total - base["m"]),
+                   "tcp_home": [float(x) for x in frames(np.zeros(7))[6][:3, 3]], "samples": samples},
+    }
+    Path(path).write_text(json.dumps(ref, indent=1) + "\n", encoding="utf-8")
+    print(f"   {path}  (model reference for robot_descriptions: {len(link_rows)} links, {len(joint_rows)} joints, "
+          f"{len(samples)} check poses)")
 
 
 if __name__ == "__main__":
     _SIM_MODEL.mkdir(parents=True, exist_ok=True)
     out_urdf = os.environ.get("RAFT_URDF_OUT", str(_SIM_MODEL / "RAFT.urdf"))
     out_dir = os.environ.get("RAFT_SRC_OUT", str(Path(__file__).resolve().parents[1] / "src" / "main"))
+    # a new SolidWorks export brings its meshes in tools/cad/meshes (upper-case .STL)
+    if (_CAD / "meshes").is_dir():
+        for n in ["base_link"] + NAMES:
+            shutil.copyfile(_CAD / "meshes" / f"{n}.STL", _SIM_MODEL / "meshes" / f"{n}.stl")
     print("\n=== Writing ===")
     write_urdf(out_urdf); print("  ", out_urdf); check_urdf(out_urdf)
     mj_dir = Path(os.environ.get("RAFT_MJCF_OUT", str(_SIM_MODEL)))
     mj_dir.mkdir(exist_ok=True)
-    write_mjcf(str(mj_dir / "RAFT.xml"), str(mj_dir / "scene.xml"), meshdir="../../../../raft_description/meshes")
+    write_mjcf(str(mj_dir / "RAFT.xml"), str(mj_dir / "scene.xml"), meshdir="meshes")
     print("  ", mj_dir / "RAFT.xml"); print("  ", mj_dir / "scene.xml"); check_mjcf(str(mj_dir / "scene.xml"))
     write_headers(os.path.join(out_dir, "raft_model.h"), os.path.join(out_dir, "golden_vectors.h"))
     print("  ", os.path.join(out_dir, "raft_model.h")); print("  ", os.path.join(out_dir, "golden_vectors.h"))
-    rel = os.environ.get("RAFT_RELEASE_OUT", str(_REPO / "raft_description"))
-    print("\n=== Public description package ===")
-    write_release(rel)
+    print("\n=== Model reference for robot_descriptions ===")
+    write_reference(os.environ.get("RAFT_REFERENCE_OUT", str(_SIM_MODEL / "raft_reference.json")), _SIM_MODEL / "meshes")

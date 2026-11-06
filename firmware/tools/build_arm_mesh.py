@@ -1,22 +1,26 @@
-"""Bake the RAFT's CAD meshes into a small binary for the web UI (offline dev tool, nothing here runs on the arm).
+"""Bake RAFT's model into a small binary for the web UI (offline dev tool, nothing here runs on the arm).
 
-1. Loads the MJCF made by gen_model.py (tools/sim/model/RAFT.xml) with MuJoCo, so every mesh sits exactly
-   where the simulator puts it.
+1. Loads RAFT's MuJoCo package from a robot_descriptions checkout (mujoco/raft/raft.xml, built there from
+   tools/sim/model/raft_reference.json) with MuJoCo, so every visual piece (printed parts, servos, horns, screws) sits
+   exactly where the model puts it and keeps the colour of the shared palette (source/appearance/colors.json).
 2. Expresses each link's vertices in the DH frame that link rides on (frames 0..6 of kinematics.cpp, 7 = the
    trigger hinge), so the page only has to apply its own forward kinematics, the same as the firmware's.
 3. Checks that mapping against MuJoCo at random poses (full-resolution vertices, error must be < 1e-5 m).
-4. Decimates every part (quadric error, fast-simplification), quantizes vertices to 16 bit per axis and writes
-   web/arm.bin, which tools/build_web.py embeds next to the page.
+4. Decimates every piece (quadric error, fast-simplification), quantizes vertices to 16 bit per axis and writes
+   web/arm.bin with the pieces' materials, which tools/build_web.py embeds next to the page.
 
-    python tools/build_arm_mesh.py [--tris N] [--agg A]
-        N = total triangle budget (default 20000; the CAD export has 84232)
+    python tools/build_arm_mesh.py [--descriptions PATH] [--tris N] [--agg A]
+        PATH = a robot_descriptions checkout (default: $RAFT_ROBOT_DESCRIPTIONS, or robot_descriptions next to
+               this repository). Only regenerating web/arm.bin needs it; the firmware build uses the committed file.
+        N = total triangle budget (default 22000; the CAD export has 84232)
         A = decimation aggressiveness, 0 careful .. 10 fast and rough (default 2)
 
 Needs: numpy, mujoco, fast-simplification (pip install fast-simplification).
 
 web/arm.bin, little-endian:
-    "RAFTMESH" u16 version=2, u16 parts
-    per part: u8 frame, u8 material (0 base, 1 link, 2 trigger), u16 vertices, u16 triangles,
+    "RAFTMESH" u16 version=3, u16 parts, u16 materials
+    per material: u8 red, green, blue (sRGB), u8 specular (0..255 = the MuJoCo material's 0..1)
+    per part: u8 frame, u8 material (index into the table), u16 vertices, u16 triangles,
               f32 min[3], f32 step[3]  (position = min + q * step, q u16 per axis)
               u16 dq[vertices][3]      zig-zag deltas of q from the previous vertex, per axis, mod 65536
               u16 di[triangles * 3]    zig-zag deltas of the index from the previous index, mod 65536
@@ -32,14 +36,23 @@ import sys
 import numpy as np
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))          # firmware/
-MJCF = os.path.join(ROOT, "tools", "sim", "model", "RAFT.xml")
+def mjcf_path(descriptions):
+    """mujoco/raft/raft.xml of a robot_descriptions checkout"""
+    candidates = [descriptions, os.environ.get("RAFT_ROBOT_DESCRIPTIONS"),
+                  os.path.join(os.path.dirname(os.path.dirname(ROOT)), "robot_descriptions")]
+    for base in [c for c in candidates if c]:
+        path = os.path.join(base, "mujoco", "raft", "raft.xml")
+        if os.path.isfile(path):
+            return path
+    sys.exit("RAFT's MuJoCo package not found: pass --descriptions <robot_descriptions checkout> "
+             "or set RAFT_ROBOT_DESCRIPTIONS")
 MODEL_H = os.path.join(ROOT, "src", "main", "raft_model.h")
 OUT = os.path.join(ROOT, "web", "arm.bin")
-JOINTS = ["joint1", "joint2", "joint3", "joint4", "joint5", "joint6", "gripper_trigger_joint"]
-# share of the triangle budget per mesh (by visual importance, not by source size)
-SHARE = {"base_link": 0.11, "link1": 0.15, "link2": 0.06, "link3": 0.20, "link4": 0.14, "link5": 0.13,
-         "link6": 0.15, "gripper_trigger": 0.06}
-MATERIAL = {"base_link": 0, "gripper_trigger": 2}
+JOINTS = ["base_joint", "shoulder_joint", "elbow_joint", "wrist_1_joint", "wrist_2_joint", "wrist_3_joint", "trigger_joint"]
+# share of the triangle budget per link (by visual importance, not by source size), then per piece within the link
+SHARE = {"base_link": 0.11, "shoulder_link": 0.15, "upper_arm_link": 0.06, "forearm_link": 0.20, "wrist_1_link": 0.14,
+         "wrist_2_link": 0.13, "wrist_3_link": 0.15, "trigger_link": 0.06}
+PIECE = {"structure": 0.62, "motors": 0.12, "horns": 0.10, "fasteners": 0.16}
 
 
 def model_from_header():
@@ -75,13 +88,16 @@ def fk(q, dh, grip_r, grip_p):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--tris", type=int, default=20000)
+    ap.add_argument("--descriptions", help="a robot_descriptions checkout (RAFT's MuJoCo package)")
+    ap.add_argument("--tris", type=int, default=22000)
     ap.add_argument("--agg", type=float, default=2.0)
     args = ap.parse_args()
     import mujoco
     import fast_simplification
 
     dh, grip_r, grip_p = model_from_header()
+    MJCF = mjcf_path(args.descriptions)
+    print("RAFT's model:", MJCF)
     m = mujoco.MjModel.from_xml_path(MJCF)
     d = mujoco.MjData(m)
     jid = [m.joint(n).id for n in JOINTS]
@@ -95,16 +111,21 @@ def main():
             b = m.body_parentid[b]
         return 0
 
-    parts = []
+    parts, mats = [], []
     for g in range(m.ngeom):
-        if m.geom_type[g] != mujoco.mjtGeom.mjGEOM_MESH:
+        if m.geom_type[g] != mujoco.mjtGeom.mjGEOM_MESH or m.geom_group[g] != 2:      # visual pieces only
             continue
         mid = m.geom_dataid[g]
         name = mujoco.mj_id2name(m, mujoco.mjtObj.mjOBJ_MESH, mid)
+        link = mujoco.mj_id2name(m, mujoco.mjtObj.mjOBJ_BODY, m.geom_bodyid[g])
+        mat = int(m.geom_matid[g])
+        if mat not in mats:
+            mats.append(mat)
         va, vn = m.mesh_vertadr[mid], m.mesh_vertnum[mid]
         fa, fn = m.mesh_faceadr[mid], m.mesh_facenum[mid]
-        parts.append(dict(name=name, geom=g, frame=frame_of_body(m.geom_bodyid[g]),
-                          v=np.array(m.mesh_vert[va:va + vn], dtype=np.float64), f=np.array(m.mesh_face[fa:fa + fn], dtype=np.int64)))
+        parts.append(dict(name=name, link=link, piece=name[len(link) + 1:], geom=g, frame=frame_of_body(m.geom_bodyid[g]),
+                          mat=mats.index(mat), v=np.array(m.mesh_vert[va:va + vn], dtype=np.float64),
+                          f=np.array(m.mesh_face[fa:fa + fn], dtype=np.int64)))
 
     def world(p):
         R = d.geom_xmat[p["geom"]].reshape(3, 3)
@@ -142,11 +163,17 @@ def main():
         d = ((d + 32768) % 65536) - 32768                    # wrap into int16
         return np.where(d >= 0, 2 * d, -2 * d - 1).astype("<u2")
 
-    blob = bytearray(b"RAFTMESH" + struct.pack("<HH", 2, len(parts)))
+    blob = bytearray(b"RAFTMESH" + struct.pack("<HHH", 3, len(parts), len(mats)))
+    for mat in mats:
+        r, g, b = (int(round(255 * c)) for c in m.mat_rgba[mat][:3])
+        blob += struct.pack("<BBBB", r, g, b, int(round(255 * m.mat_specular[mat])))
+        print("  material %-16s rgb %3d %3d %3d  specular %.2f" % (mujoco.mj_id2name(m, mujoco.mjtObj.mjOBJ_MATERIAL, mat), r, g, b, m.mat_specular[mat]))
     total_in = total_out = 0
     for p in parts:
         n_in = len(p["f"])
-        target = max(60, int(args.tris * SHARE.get(p["name"], 0.1)))
+        present = [q["piece"] for q in parts if q["link"] == p["link"]]
+        share = PIECE.get(p["piece"], 0.1) / sum(PIECE.get(k, 0.1) for k in present)
+        target = max(24, int(args.tris * SHARE.get(p["link"], 0.1) * share))
         if n_in > target:
             v, f = fast_simplification.simplify(p["vk"], p["f"].astype(np.int32), target_count=target, agg=args.agg)
         else:
@@ -163,13 +190,13 @@ def main():
         lo, hi = v.min(axis=0), v.max(axis=0)
         step = np.maximum(hi - lo, 1e-9) / 65535.0
         qv = np.clip(np.round((v - lo) / step), 0, 65535).astype(np.int64)
-        blob += struct.pack("<BBHH", p["frame"], MATERIAL.get(p["name"], 1), len(v), len(f))
+        blob += struct.pack("<BBHH", p["frame"], p["mat"], len(v), len(f))
         blob += struct.pack("<6f", *lo, *step)
         dq = np.stack([zigzag_deltas(qv[:, k]) for k in range(3)], axis=1)
         blob += dq.astype("<u2").tobytes() + zigzag_deltas(f.reshape(-1)).tobytes()
         total_in += n_in
         total_out += len(f)
-        print("  %-16s frame %d  %6d -> %5d triangles, %5d vertices, %5.0f x %5.0f x %5.0f mm"
+        print("  %-26s frame %d  %6d -> %5d triangles, %5d vertices, %5.0f x %5.0f x %5.0f mm"
               % (p["name"], p["frame"], n_in, len(f), len(v), *(1000 * (hi - lo))))
     with open(OUT, "wb") as fh:
         fh.write(blob)

@@ -1,3 +1,5 @@
+# Example check: the arm floats in MuJoCo with the J2 spring, from every keyframe of the simulators' model.
+# RAFT's public MuJoCo and URDF packages are built and checked in robot_descriptions (raft_description/README.md).
 name: check
 
 on:
@@ -5,16 +7,14 @@ on:
   pull_request:
 
 jobs:
-  description:
-    runs-on: ubuntu-latest
+  example:
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
       - name: Install
-        run: pip install mujoco numpy yourdfpy xacro
-      - name: URDF, xacro and MJCF agree with the DH table
-        run: python tools/check_description.py
+        run: pip install mujoco numpy
       - name: Gravity compensation holds every keyframe
         run: python examples/gravity_comp.py --headless --spring 718

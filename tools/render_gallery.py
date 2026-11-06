@@ -2,7 +2,8 @@
 in five poses, each in a light and a dark studio (GitHub shows the one matching the reader's theme).
 
 The arm's meshes are split into printed parts, servos, horns and screws as in render_assembly.py, each with its own
-material, and posed with the model's keyframes. The ESP32-PoE is not in raft_description; given Olimex's board STEP
+material in the colours of RAFT's palette in robot_descriptions (the raft_* keys), and posed with the simulators'
+model's keyframes. The ESP32-PoE is not in the model; given Olimex's board STEP
 (ESP32-PoE_Rev_L.step, or a GLB made from it) it sits on the Base as in the assembly manual (STEP needs cascadio).
 
     pip install mujoco trimesh pillow numpy
@@ -24,7 +25,7 @@ OUT = ra.ROOT / "Photos"
 SS = 2                                                   # rendered at twice the saved size, then scaled down
 BODIES = ["base_link", "link1", "link2", "link3", "link4", "link5", "link6", "gripper_trigger"]
 POSES = [("standby", "Standby"), ("handle_in_front", "Handle in front"), ("reach_forward", "Reach forward"),
-         ("stretched", "Stretched"), ("folded", "Folded")]
+         ("stretched", "Stretched"), ("rest", "Rest")]
 
 # Source Robotics palette for the studio: Ghost Gray / Light Gray (light), Dark Charcoal / Dark Gray (dark)
 THEMES = {
@@ -33,13 +34,17 @@ THEMES = {
     "dark": dict(top=(0.161, 0.169, 0.216), bottom=(0.067, 0.071, 0.086), floor=(0.09, 0.094, 0.11), refl=0.22,
                  ink=(228, 228, 228), key=0.6, fill=0.18, rim=0.5, amb=0.24),
 }
-# printed parts in the arm's dark grey, black servos, aluminium horns, steel screws
-MATS = {
-    "printed": dict(rgba="0.30 0.31 0.335 1", specular="0.25", shininess="0.35"),
-    "servo": dict(rgba="0.07 0.075 0.085 1", specular="0.45", shininess="0.6"),
-    "horn": dict(rgba="0.74 0.76 0.79 1", specular="0.9", shininess="0.9"),
-    "screw": dict(rgba="0.42 0.43 0.46 1", specular="0.8", shininess="0.8"),
-}
+# the model's palette: printed parts, servos, horns, screws (render_assembly's piece classes -> palette keys)
+# RAFT's starting colours in robot_descriptions' palette (source/appearance/colors.json: raft_* keys, motors)
+PALETTE = {"structure": [0.3, 0.31, 0.335, 1], "motors": [0.06, 0.06, 0.065, 1], "horns": [0.74, 0.76, 0.79, 1],
+           "fasteners": [0.42, 0.43, 0.46, 1]}
+def _rgba(v):                                            # "#RRGGBB" or [r, g, b, 1], as gen_model accepts
+    return [int(v[i:i + 2], 16) / 255 for i in (1, 3, 5)] + [1] if isinstance(v, str) else v
+
+
+MATS = {cls: dict(rgba=" ".join(f"{c:.4g}" for c in _rgba(PALETTE[key])), specular=sp, shininess=sh)
+        for cls, key, sp, sh in (("printed", "structure", "0.25", "0.35"), ("servo", "motors", "0.45", "0.6"),
+                                 ("horn", "horns", "0.9", "0.9"), ("screw", "fasteners", "0.8", "0.8"))}
 
 
 def pieces_with_links(esp32):

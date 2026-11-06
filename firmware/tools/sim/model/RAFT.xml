@@ -4,8 +4,8 @@
        Body i frame = DH frame i-1, joint i turns about its z; qpos = 0 is the CAD / PAR6 standby pose.
        PAR6/RCB DH angles: theta = q + [0, -pi/2, pi, 0, 0, pi]. Actuators take output torque in Nm.
        Servo armature 0.003, frictionloss 0.02, damping 0.01 are ESTIMATES, not measured.
-       Joint ranges are placeholders until measured. -->
-  <compiler angle="radian" meshdir="../../../../raft_description/meshes" autolimits="true" inertiafromgeom="false"/>
+       Joint ranges are the firmware's design ranges (control.cpp); the measured ones are in raft_reference.json. -->
+  <compiler angle="radian" meshdir="meshes" autolimits="true" inertiafromgeom="false"/>
   <option timestep="0.001" integrator="implicitfast"/>
   <default>
     <default class="raft">
@@ -49,7 +49,7 @@
           <site name="j2_spring_pin" pos="0 -0.02 -0.033"/>
           <body name="link3" pos="0 -0.1 0" quat="0 0.707106781187 -0.707106781187 0">
             <inertial pos="0.01484 0.00744 0.0025" mass="0.0714" fullinertia="1.3758e-05 1.73834e-05 1.81406e-05 -7.469e-08 -1.53769e-06 2.9759e-07"/>
-            <joint name="joint3" range="-1.308997 2.617994"/>
+            <joint name="joint3" range="-1.402023 2.617994"/>
             <geom mesh="link3" material="link3" pos="0.02416 0 0" quat="0 0 0.707106781187 0.707106781187"/>
             <body name="link4" pos="0.02416 0 0" quat="0 0 0.707106781187 0.707106781187">
               <inertial pos="-2e-05 0.02135 -0.07139" mass="0.0461" fullinertia="4.66724e-05 3.83882e-05 1.07566e-05 -1.577e-08 4.116e-08 1.53861e-05"/>
@@ -103,6 +103,6 @@
     <key name="handle_in_front" qpos="0 0.349065850399 0 0 0 0 0"/>
     <key name="reach_forward" qpos="0 0.785398163397 0.785398163397 0 0 0 0"/>
     <key name="stretched" qpos="0 1.57079632679 1.57079632679 0 0 0 0"/>
-    <key name="rest" qpos="0 0 -1.2217304764 0 0 0 0"/>
+    <key name="rest" qpos="0 -1.43116998664 -1.3962634016 0 0 0 0"/>
   </keyframe>
 </mujoco>

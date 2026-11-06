@@ -12,12 +12,12 @@
     </inertial>
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0"/>
-      <geometry><mesh filename="../../../../raft_description/meshes/base_link.stl"/></geometry>
+      <geometry><mesh filename="meshes/base_link.stl"/></geometry>
       <material name="grey"><color rgba="0.8 0.8 0.8 1"/></material>
     </visual>
     <collision>
       <origin xyz="0 0 0" rpy="0 0 0"/>
-      <geometry><mesh filename="../../../../raft_description/meshes/base_link.stl"/></geometry>
+      <geometry><mesh filename="meshes/base_link.stl"/></geometry>
     </collision>
   </link>
   <link name="link1">
@@ -28,12 +28,12 @@
     </inertial>
     <visual>
       <origin xyz="0.013 0 0.05122" rpy="-1.57079632679 0 0"/>
-      <geometry><mesh filename="../../../../raft_description/meshes/link1.stl"/></geometry>
+      <geometry><mesh filename="meshes/link1.stl"/></geometry>
       <material name="grey"><color rgba="0.8 0.8 0.8 1"/></material>
     </visual>
     <collision>
       <origin xyz="0.013 0 0.05122" rpy="-1.57079632679 0 0"/>
-      <geometry><mesh filename="../../../../raft_description/meshes/link1.stl"/></geometry>
+      <geometry><mesh filename="meshes/link1.stl"/></geometry>
     </collision>
   </link>
   <joint name="joint1" type="revolute">
@@ -41,7 +41,7 @@
     <parent link="base_link"/>
     <child link="link1"/>
     <axis xyz="0 0 1"/>
-    <limit lower="-3.14159" upper="3.14159" effort="0.588" velocity="6"/>
+    <limit lower="-3.14159265359" upper="3.14159265359" effort="0.588" velocity="6"/>
   </joint>
   <link name="link2">
     <inertial>
@@ -51,12 +51,12 @@
     </inertial>
     <visual>
       <origin xyz="0 -0.1 0" rpy="3.14159265359 0 -1.57079632679"/>
-      <geometry><mesh filename="../../../../raft_description/meshes/link2.stl"/></geometry>
+      <geometry><mesh filename="meshes/link2.stl"/></geometry>
       <material name="grey"><color rgba="0.8 0.8 0.8 1"/></material>
     </visual>
     <collision>
       <origin xyz="0 -0.1 0" rpy="3.14159265359 0 -1.57079632679"/>
-      <geometry><mesh filename="../../../../raft_description/meshes/link2.stl"/></geometry>
+      <geometry><mesh filename="meshes/link2.stl"/></geometry>
     </collision>
   </link>
   <joint name="joint2" type="revolute">
@@ -64,7 +64,7 @@
     <parent link="link1"/>
     <child link="link2"/>
     <axis xyz="0 0 1"/>
-    <limit lower="-1.8326" upper="2.26893" effort="0.588" velocity="6"/>
+    <limit lower="-1.83259571459" upper="2.26892802759" effort="0.588" velocity="6"/>
   </joint>
   <link name="link3">
     <inertial>
@@ -74,12 +74,12 @@
     </inertial>
     <visual>
       <origin xyz="0.02416 0 0" rpy="1.57079632679 0 3.14159265359"/>
-      <geometry><mesh filename="../../../../raft_description/meshes/link3.stl"/></geometry>
+      <geometry><mesh filename="meshes/link3.stl"/></geometry>
       <material name="grey"><color rgba="0.8 0.8 0.8 1"/></material>
     </visual>
     <collision>
       <origin xyz="0.02416 0 0" rpy="1.57079632679 0 3.14159265359"/>
-      <geometry><mesh filename="../../../../raft_description/meshes/link3.stl"/></geometry>
+      <geometry><mesh filename="meshes/link3.stl"/></geometry>
     </collision>
   </link>
   <joint name="joint3" type="revolute">
@@ -87,7 +87,7 @@
     <parent link="link2"/>
     <child link="link3"/>
     <axis xyz="0 0 1"/>
-    <limit lower="-1.309" upper="2.61799" effort="0.588" velocity="6"/>
+    <limit lower="-1.40202298813" upper="2.61799387799" effort="0.588" velocity="6"/>
   </joint>
   <link name="link4">
     <inertial>
@@ -97,12 +97,12 @@
     </inertial>
     <visual>
       <origin xyz="0 0 -0.09792" rpy="-1.57079632679 0 0"/>
-      <geometry><mesh filename="../../../../raft_description/meshes/link4.stl"/></geometry>
+      <geometry><mesh filename="meshes/link4.stl"/></geometry>
       <material name="grey"><color rgba="0.8 0.8 0.8 1"/></material>
     </visual>
     <collision>
       <origin xyz="0 0 -0.09792" rpy="-1.57079632679 0 0"/>
-      <geometry><mesh filename="../../../../raft_description/meshes/link4.stl"/></geometry>
+      <geometry><mesh filename="meshes/link4.stl"/></geometry>
     </collision>
   </link>
   <joint name="joint4" type="revolute">
@@ -110,7 +110,7 @@
     <parent link="link3"/>
     <child link="link4"/>
     <axis xyz="0 0 1"/>
-    <limit lower="-3.14159" upper="3.14159" effort="0.588" velocity="6"/>
+    <limit lower="-3.14159265359" upper="3.14159265359" effort="0.588" velocity="6"/>
   </joint>
   <link name="link5">
     <inertial>
@@ -120,12 +120,12 @@
     </inertial>
     <visual>
       <origin xyz="0 0 0" rpy="1.57079632679 0 0"/>
-      <geometry><mesh filename="../../../../raft_description/meshes/link5.stl"/></geometry>
+      <geometry><mesh filename="meshes/link5.stl"/></geometry>
       <material name="grey"><color rgba="0.8 0.8 0.8 1"/></material>
     </visual>
     <collision>
       <origin xyz="0 0 0" rpy="1.57079632679 0 0"/>
-      <geometry><mesh filename="../../../../raft_description/meshes/link5.stl"/></geometry>
+      <geometry><mesh filename="meshes/link5.stl"/></geometry>
     </collision>
   </link>
   <joint name="joint5" type="revolute">
@@ -133,7 +133,7 @@
     <parent link="link4"/>
     <child link="link5"/>
     <axis xyz="0 0 1"/>
-    <limit lower="-3.14159" upper="3.14159" effort="0.588" velocity="6"/>
+    <limit lower="-3.14159265359" upper="3.14159265359" effort="0.588" velocity="6"/>
   </joint>
   <link name="link6">
     <inertial>
@@ -143,12 +143,12 @@
     </inertial>
     <visual>
       <origin xyz="0 0 -0.078277" rpy="3.14159265359 0 3.14159265359"/>
-      <geometry><mesh filename="../../../../raft_description/meshes/link6.stl"/></geometry>
+      <geometry><mesh filename="meshes/link6.stl"/></geometry>
       <material name="grey"><color rgba="0.8 0.8 0.8 1"/></material>
     </visual>
     <collision>
       <origin xyz="0 0 -0.078277" rpy="3.14159265359 0 3.14159265359"/>
-      <geometry><mesh filename="../../../../raft_description/meshes/link6.stl"/></geometry>
+      <geometry><mesh filename="meshes/link6.stl"/></geometry>
     </collision>
   </link>
   <joint name="joint6" type="revolute">
@@ -156,7 +156,7 @@
     <parent link="link5"/>
     <child link="link6"/>
     <axis xyz="0 0 1"/>
-    <limit lower="-3.14159" upper="3.14159" effort="0.588" velocity="6"/>
+    <limit lower="-3.14159265359" upper="3.14159265359" effort="0.588" velocity="6"/>
   </joint>
   <link name="tcp"/>
   <joint name="tcp_joint" type="fixed">
@@ -172,12 +172,12 @@
     </inertial>
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0"/>
-      <geometry><mesh filename="../../../../raft_description/meshes/gripper_trigger.stl"/></geometry>
+      <geometry><mesh filename="meshes/gripper_trigger.stl"/></geometry>
       <material name="grey"><color rgba="0.8 0.8 0.8 1"/></material>
     </visual>
     <collision>
       <origin xyz="0 0 0" rpy="0 0 0"/>
-      <geometry><mesh filename="../../../../raft_description/meshes/gripper_trigger.stl"/></geometry>
+      <geometry><mesh filename="meshes/gripper_trigger.stl"/></geometry>
     </collision>
   </link>
   <joint name="gripper_trigger_joint" type="revolute">
@@ -185,6 +185,6 @@
     <parent link="link6"/>
     <child link="gripper_trigger"/>
     <axis xyz="0 0 1"/>
-    <limit lower="-1.5708" upper="1.5708" effort="0.588" velocity="6"/>
+    <limit lower="-1.57079632679" upper="1.57079632679" effort="0.588" velocity="6"/>
   </joint>
 </robot>

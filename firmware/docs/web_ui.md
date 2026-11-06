@@ -128,16 +128,23 @@ shows the stick arm, because a page opened from disk may not read `arm.bin`.
 
 ## The arm model
 
-`web/arm.bin` is made from the CAD by `python tools/build_arm_mesh.py`. Rerun it after a CAD change, after
-`tools/gen_model.py`. It:
-- **Places the meshes.** It loads the MuJoCo model, so every mesh sits where the simulator puts it.
-- **Re-expresses them.** It stores each link's vertices in the DH frame that link rides on, so the page only applies forward kinematics.
+`web/arm.bin` is made from RAFT's MuJoCo package in [robot_descriptions](https://github.com/Source-Robotics/robot_descriptions) by
+`python tools/build_arm_mesh.py --descriptions <robot_descriptions checkout>`. Rerun it after the model changes there
+(a CAD change, or new colours). It:
+- **Places the pieces.** It loads `mujoco/raft/raft.xml`, so every visual piece sits where the model puts it: printed
+  parts, servos, horns and screws.
+- **Keeps their colours.** Each piece keeps its material from robot_descriptions' shared palette
+  (`source/appearance/colors.json`, the `raft_*` keys), so a colour changed there shows in the page too. Horns and
+  screws shine more than the printed parts.
+- **Re-expresses them.** It stores each piece's vertices in the DH frame its link rides on, so the page only applies
+  forward kinematics.
 - **Checks the mapping.** It compares against MuJoCo at 25 random poses; the worst vertex error is 3 nm.
-- **Shrinks them.** It decimates the 84,232 CAD triangles to 20,000, keeps 16 bits per coordinate, and delta-encodes vertices and indices so gzip works well.
+- **Shrinks them.** It decimates the 84,232 CAD triangles to about 20,000, most of them for the printed parts (the
+  screws give up the most), keeps 16 bits per coordinate, and delta-encodes vertices and indices so gzip works well.
 
 | Triangles (`--tris`) | arm.bin gzipped | Look |
 |---|---|---|
-| 20,000 (default) | 86 kB | indistinguishable from the CAD at normal zoom |
+| 22,000 (default) | 81 kB | indistinguishable from the CAD at normal zoom |
 | 30,000 | 124 kB | same |
 | 40,000 | 160 kB | same |
 | 84,232 (all) | 485 kB | does not fit the over-the-air slot next to the firmware |

@@ -15,7 +15,7 @@
 --ok:#37C6A5;--oktext:#127A62;--warn:#E8A33D;--warntext:#94600C;--badfill:#C8343A;--badtext:#B8272E;
 --sbar:#292B37;--sbartext:#F5F5F5;--sbarmuted:#A9ADB8;--view1:#FFFFFF;--view2:#E9ECEF;--hud:rgba(255,255,255,.88);
 --arm:#C4CAD2;--armd:#7B8491;--armh:#FFFFFF;--grid:rgba(41,43,55,.07);--grid2:rgba(41,43,55,.2);--shadow:rgba(17,18,22,.13);
---mesh:#BFC5CD;--meshb:#6C7581;--meshacc:#143952;--ghostF:#2BB394;--ghostT:#E8A33D;--ax0:#C8343A;--ax1:#22A383;--ax2:#143952;
+--ghostF:#2BB394;--ghostT:#E8A33D;--ax0:#C8343A;--ax1:#22A383;--ax2:#143952;
 --s0:#143952;--s1:#E8A33D;--s2:#37C6A5;--s3:#6E5E9B;--s4:#C8343A;--s5:#91BCD6;--s6:#292B37;--cardsh:0 1px 2px rgba(17,18,22,.05);
 --sans:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
 --mono:ui-monospace,"Cascadia Mono","SF Mono",Menlo,Consolas,"Roboto Mono",monospace;color-scheme:light}
@@ -23,13 +23,13 @@
 --nav:#91BCD6;--navbg:rgba(145,188,214,.12);--primary:#91BCD6;--onprimary:#111216;--focus:#91BCD6;--ok:#37C6A5;--oktext:#37C6A5;--warn:#E8A33D;--warntext:#E8A33D;--badfill:#D03A3A;--badtext:#EF5552;
 --sbar:#0B0C0F;--sbartext:#E4E4E4;--sbarmuted:#8B90A0;--view1:#20232B;--view2:#111216;--hud:rgba(26,28,34,.84);
 --arm:#3C4250;--armd:#1B1E25;--armh:#A9B6C8;--grid:rgba(200,210,225,.07);--grid2:rgba(200,210,225,.2);--shadow:rgba(0,0,0,.35);
---mesh:#6B7486;--meshb:#2E3440;--meshacc:#91BCD6;--ghostF:#37C6A5;--ghostT:#E8A33D;--ax0:#EF5552;--ax1:#37C6A5;--ax2:#91BCD6;
+--ghostF:#37C6A5;--ghostT:#E8A33D;--ax0:#EF5552;--ax1:#37C6A5;--ax2:#91BCD6;
 --s0:#91BCD6;--s1:#E8A33D;--s2:#37C6A5;--s3:#A99BD6;--s4:#EF5552;--s5:#5E8CB0;--s6:#E4E4E4;--cardsh:none;color-scheme:dark}}
 :root[data-theme=dark]{--bg:#111216;--panel:#1A1C22;--panel2:#1E2027;--sunken:#14161B;--line:#2A2D36;--line2:#373B46;--text:#F5F5F5;--muted:#A7ABB6;--faint:#757A88;
 --nav:#91BCD6;--navbg:rgba(145,188,214,.12);--primary:#91BCD6;--onprimary:#111216;--focus:#91BCD6;--ok:#37C6A5;--oktext:#37C6A5;--warn:#E8A33D;--warntext:#E8A33D;--badfill:#D03A3A;--badtext:#EF5552;
 --sbar:#0B0C0F;--sbartext:#E4E4E4;--sbarmuted:#8B90A0;--view1:#20232B;--view2:#111216;--hud:rgba(26,28,34,.84);
 --arm:#3C4250;--armd:#1B1E25;--armh:#A9B6C8;--grid:rgba(200,210,225,.07);--grid2:rgba(200,210,225,.2);--shadow:rgba(0,0,0,.35);
---mesh:#6B7486;--meshb:#2E3440;--meshacc:#91BCD6;--ghostF:#37C6A5;--ghostT:#E8A33D;--ax0:#EF5552;--ax1:#37C6A5;--ax2:#91BCD6;
+--ghostF:#37C6A5;--ghostT:#E8A33D;--ax0:#EF5552;--ax1:#37C6A5;--ax2:#91BCD6;
 --s0:#91BCD6;--s1:#E8A33D;--s2:#37C6A5;--s3:#A99BD6;--s4:#EF5552;--s5:#5E8CB0;--s6:#E4E4E4;--cardsh:none;color-scheme:dark}
 *{box-sizing:border-box}
 html,body{margin:0;height:100%}
@@ -699,7 +699,7 @@ const C4 = {};
 let SERIES = [];
 function readColors() {
   const cs = getComputedStyle(document.documentElement);
-  for (const k of ['arm', 'armd', 'armh', 'grid', 'grid2', 'shadow', 'nav', 'warn', 'muted', 'faint', 'ok', 'badfill', 'text', 'mesh', 'meshb', 'meshacc', 'ghostF', 'ghostT',
+  for (const k of ['arm', 'armd', 'armh', 'grid', 'grid2', 'shadow', 'nav', 'warn', 'muted', 'faint', 'ok', 'badfill', 'text', 'ghostF', 'ghostT',
                    'ax0', 'ax1', 'ax2', 'panel2', 'line', 's0', 's1', 's2', 's3', 's4', 's5', 's6']) {
     C[k] = cs.getPropertyValue('--' + k).trim();
     C4[k] = rgba(C[k]);
@@ -805,17 +805,19 @@ function message(t) {
 // the same forward kinematics as above. Lit, with a planar shadow and see-through ghosts. If WebGL or the
 // meshes are missing, the stick figure above stays.
 const glc = $('#gl');
-const G = { gl: null, prog: null, u: {}, a: {}, parts: [], ready: false, tris: 0, grid: null, nGrid: 0, axes: null, failed: '' };
+const G = { gl: null, prog: null, u: {}, a: {}, parts: [], mats: [], ready: false, tris: 0, grid: null, nGrid: 0, axes: null, failed: '' };
 const VS = 'attribute vec3 aPos; attribute vec3 aNrm; uniform mat4 uVP; uniform mat4 uM; varying vec3 vN; varying vec3 vW;\n' +
   'void main() { vec4 w = uM * vec4(aPos, 1.0); vW = w.xyz; vN = mat3(uM) * aNrm; gl_Position = uVP * w; }';
-const FS = 'precision mediump float; uniform vec4 uColor; uniform int uLit; uniform vec3 uEye; uniform vec3 uKey; varying vec3 vN; varying vec3 vW;\n' +
+const FS = 'precision mediump float; uniform vec4 uColor; uniform float uSpec; uniform int uLit; uniform vec3 uEye; uniform vec3 uKey; varying vec3 vN; varying vec3 vW;\n' +
   'void main() {\n' +
   '  if (uLit == 0) { gl_FragColor = uColor; return; }\n' +
   '  vec3 n = normalize(vN); vec3 v = normalize(uEye - vW);\n' +
   '  if (dot(n, v) < 0.0) n = -n;\n' +
   '  float key = max(dot(n, uKey), 0.0), fill = max(dot(n, normalize(vec3(-0.4, -0.5, 0.6))), 0.0), hemi = 0.5 + 0.5 * n.z;\n' +
-  '  float spec = pow(max(dot(n, normalize(uKey + v)), 0.0), 40.0) * 0.30, rim = pow(1.0 - max(dot(n, v), 0.0), 3.0) * 0.16;\n' +
-  '  gl_FragColor = vec4(uColor.rgb * (0.26 + 0.20 * hemi + 0.62 * key + 0.16 * fill) + vec3(spec + rim), uColor.a);\n' +
+  '  float spec = pow(max(dot(n, normalize(uKey + v)), 0.0), 40.0) * uSpec * 0.5, rim = pow(1.0 - max(dot(n, v), 0.0), 3.0) * 0.035;\n' +
+  // lit in linear light, then back to sRGB: the palette's dark grey prints and black servos keep their shading
+  '  vec3 lin = pow(uColor.rgb, vec3(2.2)) * (0.30 + 0.25 * hemi + 0.75 * key + 0.20 * fill) + vec3(spec + rim);\n' +
+  '  gl_FragColor = vec4(pow(lin, vec3(1.0 / 2.2)), uColor.a);\n' +
   '}';
 const I4 = new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
 const SHADOW = new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0.22, -0.12, 0, 0, 0, 0, 0.0008, 1]);   // onto z = 0, light slightly off vertical
@@ -837,7 +839,7 @@ function glInit() {
     G.prog = p;
   } catch (e) { G.failed = 'shader: ' + e.message; return false; }
   G.gl = gl;
-  for (const n of ['uVP', 'uM', 'uColor', 'uLit', 'uEye', 'uKey']) G.u[n] = gl.getUniformLocation(G.prog, n);
+  for (const n of ['uVP', 'uM', 'uColor', 'uSpec', 'uLit', 'uEye', 'uKey']) G.u[n] = gl.getUniformLocation(G.prog, n);
   G.a.pos = gl.getAttribLocation(G.prog, 'aPos');
   G.a.nrm = gl.getAttribLocation(G.prog, 'aNrm');
   const grid = [];
@@ -848,13 +850,16 @@ function glInit() {
   return true;
 }
 function glBuf(data) { const gl = G.gl, b = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, b); gl.bufferData(gl.ARRAY_BUFFER, data, gl.STATIC_DRAW); return b; }
+// arm.bin version 3: the model's visual pieces, each with a material (palette colour and shine) from colors.json
 function parseMesh(buf) {
   const v = new DataView(buf);
-  if (buf.byteLength < 12 || String.fromCharCode.apply(null, new Uint8Array(buf, 0, 8)) !== 'RAFTMESH' || v.getUint16(8, true) !== 2)
-    throw new Error('not a RAFT mesh file (version 2)');
+  if (buf.byteLength < 14 || String.fromCharCode.apply(null, new Uint8Array(buf, 0, 8)) !== 'RAFTMESH' || v.getUint16(8, true) !== 3)
+    throw new Error('not a RAFT mesh file (version 3)');
   const unzig = (u) => (u >>> 1) ^ -(u & 1);         // zig-zag decode
-  const parts = [];
-  let o = 12;
+  const parts = [], mats = [];
+  let o = 14;
+  for (let i = 0, n = v.getUint16(12, true); i < n; i++, o += 4)
+    mats.push({ c: [v.getUint8(o) / 255, v.getUint8(o + 1) / 255, v.getUint8(o + 2) / 255, 1], s: 0.1 + 0.45 * v.getUint8(o + 3) / 255 });
   for (let i = 0, n = v.getUint16(10, true); i < n; i++) {
     const frame = v.getUint8(o), mat = v.getUint8(o + 1), nv = v.getUint16(o + 2, true), nt = v.getUint16(o + 4, true);
     o += 6;
@@ -866,7 +871,8 @@ function parseMesh(buf) {
     for (let j = 0; j < nt * 3; j++, o += 2) { last = (last + unzig(v.getUint16(o, true))) & 0xffff; idx[j] = last; }
     parts.push({ frame, mat, pos, idx });
   }
-  return parts;
+  if (parts.some((p) => p.mat >= mats.length)) throw new Error('a piece names a missing material');
+  return { parts, mats };
 }
 // unshared triangles with normals averaged over neighbours less than 40 deg apart: smooth curves, crisp edges
 function expandPart(pos, idx) {
@@ -906,7 +912,9 @@ function loadMeshes() {
     : fetch('arm.bin').then((r) => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.arrayBuffer(); });
   get
     .then((buf) => {
-      G.parts = parseMesh(buf).map((p) => { const e = expandPart(p.pos, p.idx); return { frame: p.frame, mat: p.mat, vbo: glBuf(e.P), nbo: glBuf(e.N), n: e.n }; });
+      const mesh = parseMesh(buf);
+      G.mats = mesh.mats;
+      G.parts = mesh.parts.map((p) => { const e = expandPart(p.pos, p.idx); return { frame: p.frame, mat: p.mat, vbo: glBuf(e.P), nbo: glBuf(e.N), n: e.n }; });
       G.tris = G.parts.reduce((s, p) => s + p.n / 3, 0);
       G.ready = true; dirty = true;
       logLine('okk', 'arm model loaded: ' + G.tris + ' triangles');
@@ -982,7 +990,8 @@ function glRender(q, ghosts) {
   gl.uniform1i(G.u.uLit, 1);
   for (const p of G.parts) {
     gl.uniformMatrix4fv(G.u.uM, false, mat4(T[p.frame]));
-    gl.uniform4fv(G.u.uColor, p.mat === 0 ? C4.meshb : p.mat === 2 ? C4.meshacc : C4.mesh);
+    const mt = G.mats[p.mat];                 // the model's palette: printed parts, servos, horns, screws
+    gl.uniform4fv(G.u.uColor, mt.c); gl.uniform1f(G.u.uSpec, mt.s);
     glDrawPart(p);
   }
   // see-through ghosts (move target, PAR6 follower), one even layer each: a depth-only pass finds the nearest
@@ -993,7 +1002,7 @@ function glRender(q, ghosts) {
     gl.disable(gl.BLEND); gl.colorMask(false, false, false, false); gl.depthMask(true); gl.depthFunc(gl.LESS);
     for (const p of moving) { gl.uniformMatrix4fv(G.u.uM, false, mat4(Tg[p.frame])); glDrawPart(p); }
     gl.enable(gl.BLEND); gl.colorMask(true, true, true, true); gl.depthMask(false); gl.depthFunc(gl.EQUAL);
-    gl.uniform4fv(G.u.uColor, gh.color);
+    gl.uniform4fv(G.u.uColor, gh.color); gl.uniform1f(G.u.uSpec, 0.3);
     for (const p of moving) { gl.uniformMatrix4fv(G.u.uM, false, mat4(Tg[p.frame])); glDrawPart(p); }
     gl.depthFunc(gl.LEQUAL);
   }
@@ -2449,7 +2458,7 @@ const demo = {
       if (done) { this.goal = null; this.ev |= 1; }
     } else if (this.mode === 1) {
       this.q[0] = 0.35 * Math.sin(t * 0.4); this.q[1] = 0.3 + 0.25 * Math.sin(t * 0.3); this.q[2] = 0.35 + 0.3 * Math.sin(t * 0.37 + 1);
-      this.q[4] = 0.4 * Math.sin(t * 0.5); this.q[6] = 0.3 * Math.sin(t * 0.8) + 0.3;
+      this.q[4] = 0.4 * Math.sin(t * 0.5); this.q[6] = -0.3 * Math.sin(t * 0.8) - 0.3;   // the trigger opens toward negative angles
     }
     const T = fk(this.q), R = T[6].R;
     const pitch = Math.asin(clamp(R[2], -1, 1)), roll = Math.atan2(-R[5], R[8]), yaw = Math.atan2(-R[1], R[0]);

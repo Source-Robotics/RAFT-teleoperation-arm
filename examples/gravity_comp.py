@@ -1,4 +1,4 @@
-"""RAFT floating in MuJoCo: the motors cancel gravity, as the firmware does on the ESP32 (there in C++, at 200 Hz).
+"""RAFT floating in MuJoCo: the motors cancel gravity, as the firmware does on the ESP32 (there in C++, at 250 Hz).
 
     pip install mujoco
     python examples/gravity_comp.py                  # move the arm: double-click a link, then Ctrl + right-drag
@@ -15,7 +15,7 @@ from pathlib import Path
 import mujoco
 import numpy as np
 
-SCENE = Path(__file__).resolve().parents[1] / "raft_description" / "mjcf" / "scene.xml"
+SCENE = Path(__file__).resolve().parents[1] / "firmware" / "tools" / "sim" / "model" / "scene.xml"   # the simulators' model
 
 
 def compensate(m, d):

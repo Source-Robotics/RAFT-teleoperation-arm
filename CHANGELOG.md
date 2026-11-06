@@ -22,11 +22,17 @@ simulation.
   - Hold PAR6 (a clutch), realign, precision, joint locks and guides.
   - Haptic walls at the joint limits, and optional contact force feedback.
 - **Web UI served by the arm.**
-  - A 3D view of the real arm, with a joints table, a live plot and a console under it.
+  - A 3D view of the real arm in the model's colours (printed parts, servos, horns, screws), with a joints table,
+    a live plot and a console under it.
   - Pages: Drive, Teleop, Calibrate, Servos, Settings, a 250 Hz capture (Plots) and loop and bus health.
   - Search with Ctrl K.
   - The status is sent when it changes, plus a binary health message once a second.
-- **Robot description:** URDF, xacro and MuJoCo models with meshes; a ROS 2 display launch.
+- **Robot models in [robot_descriptions](https://github.com/Source-Robotics/robot_descriptions)**, like PAR6's and PAROL6's
+  ([model guide](raft_description/README.md)).
+  - A MuJoCo and a URDF / ROS 2 package with PAR6's joint names, built there from
+    `firmware/tools/sim/model/raft_reference.json`, which the firmware's model generator writes.
+  - Coloured printed parts, servos, horns and screws from the shared palette; joint ranges from the measured stops
+    and a sweep of the CAD; `home` and `parked` (the rest pose) keyframes. CC BY 4.0.
 - **PC tools:** a MuJoCo simulator of the arm, an emulated PAR6, the web UI against the simulator, unit tests and
   browser tests.
 - **Hardware:** STEP and print files, the BOM, and an assembly manual with a picture for every step.

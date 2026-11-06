@@ -1,6 +1,6 @@
 """Build the RAFT URDF viewer (dev tool, run on a PC after gen_model.py).
 
-Packs tools/sim/model/RAFT.urdf and the meshes of raft_description into one HTML page (three.js from a CDN):
+Packs tools/sim/model/RAFT.urdf and its CAD meshes (tools/sim/model/meshes) into one HTML page (three.js from a CDN):
   docs/raft_viewer.html            standalone page, open it in a browser (needs internet for three.js); not in git
   <--fragment PATH>                the same page without the html/head/body wrapper (for publishing)
 
@@ -17,7 +17,7 @@ import trimesh
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parents[1]
 URDF = HERE / "sim" / "model" / "RAFT.urdf"
-MESH_DIR = REPO / "raft_description" / "meshes"
+MESH_DIR = HERE / "sim" / "model" / "meshes"
 
 
 def pack_mesh(path):

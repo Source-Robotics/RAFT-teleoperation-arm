@@ -1,13 +1,13 @@
 """Render the assembly manual's pictures from the robot description into "Assembly manual/images/".
 
-Every link mesh of raft_description is split into its shells and sorted into printed parts, servos (one piece per
+Every link mesh of the arm's model (the simulators' MJCF, CAD link names) is split into its shells and sorted into printed parts, servos (one piece per
 servo, with its 4 mounting screws), horns and M3 screws (the joint stops and the base lid's). The pictures show the
 arm in its standby pose, built up step by step:
 - **Fitted parts:** light grey.
 - **New parts:** in colour.
 - **A part that goes onto a horn:** drawn pulled back along that joint's axis, with an arrow to where it goes.
 
-The ESP32-PoE is not in raft_description. Given its STEP (Olimex ESP32-PoE rev L, `ESP32-PoE_Rev_L.step`), the
+The ESP32-PoE is not in the arm's model. Given its STEP (Olimex ESP32-PoE rev L, `ESP32-PoE_Rev_L.step`), the
 pictures show it on the Base's three posts, in its own colours (reading STEP needs `pip install cascadio`):
 
     pip install mujoco trimesh pillow numpy
@@ -24,7 +24,7 @@ import trimesh
 from PIL import Image, ImageDraw, ImageFont
 
 ROOT = Path(__file__).resolve().parents[1]
-MJCF = ROOT / "raft_description" / "mjcf" / "raft.xml"
+MJCF = ROOT / "firmware" / "tools" / "sim" / "model" / "RAFT.xml"   # the CAD link names and one mesh per link
 OUT = ROOT / "Assembly manual" / "images"
 W, H = 1500, 1100                      # rendered size; saved 1000 wide
 FOVY = 30.0

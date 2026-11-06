@@ -46,6 +46,29 @@ ESP32-PoE runs everything on board, with no PC in the loop:
   limits and a clutch.
 - **Over-the-network updates** when the board runs on PoE.
 
+## 🖼️ Gallery
+
+<p align="center">
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="Photos/render_hero_dark.png">
+  <img src="Photos/render_hero_light.png" alt="RAFT with the handle held in front, as for teleoperation" width="49%">
+</picture>
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="Photos/render_back_dark.png">
+  <img src="Photos/render_back_light.png" alt="RAFT from behind, reaching forward, with the ESP32-PoE on the base" width="49%">
+</picture>
+</p>
+
+<p align="center">
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="Photos/render_poses_dark.png">
+  <img src="Photos/render_poses_light.png" alt="RAFT in five poses: standby, handle in front, reach forward, stretched, rest">
+</picture>
+</p>
+
+Rendered from the arm's MuJoCo model by [`tools/render_gallery.py`](tools/render_gallery.py), like the picture at the
+top.
+
 ## 📁 What is in here
 
 | Folder / file | Contents |
@@ -56,7 +79,7 @@ ESP32-PoE runs everything on board, with no PC in the loop:
 | [`firmware/`](firmware/) | ESP32 firmware (PlatformIO, C++), web UI, host tests and simulators, documentation |
 | [`raft_description`](raft_description/) | the model guide: URDF and MuJoCo downloads, from [robot_descriptions](https://github.com/Source-Robotics/robot_descriptions) |
 | [`examples/`](examples/) | `gravity_comp.py`: the arm floating in MuJoCo |
-| [`tools/`](tools/) | `render_assembly.py` (the assembly pictures), `render_cover.py` (the picture at the top) |
+| [`tools/`](tools/) | `render_assembly.py` (the assembly pictures), `render_gallery.py` (the picture at the top and the gallery) |
 | [`datasheets/`](datasheets/) | ESP32-PoE, HLS3606, TTLinker |
 
 ## ⚒️How to build ?

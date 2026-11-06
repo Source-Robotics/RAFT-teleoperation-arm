@@ -1,5 +1,6 @@
-"""Render the README's cover picture of RAFT from its MuJoCo model into "Photos/RAFT_arm_img.png": the arm with the
-handle held in front, as for teleoperation, in a dark studio.
+"""Render the README's pictures of RAFT from its MuJoCo model into "Photos/": two views of the whole arm and the arm
+in five poses, each in a light and a dark studio (GitHub shows the one matching the reader's theme), and the cover
+at the top, RAFT_arm_img.png (the dark view with the handle held in front).
 
 The arm's meshes are split into printed parts, servos, horns and screws as in render_assembly.py, each with its own
 material in the colours of RAFT's palette in robot_descriptions (the raft_* keys), and posed with the simulators'
@@ -7,7 +8,7 @@ model's keyframes. The ESP32-PoE is not in the model; given Olimex's board STEP
 (ESP32-PoE_Rev_L.step, or a GLB made from it) it sits on the Base as in the assembly manual (STEP needs cascadio).
 
     pip install mujoco trimesh pillow numpy
-    python tools/render_cover.py [--esp32 path/to/ESP32-PoE_Rev_L.step]
+    python tools/render_gallery.py [--esp32 path/to/ESP32-PoE_Rev_L.step]
 """
 import argparse
 import sys
@@ -16,18 +17,24 @@ from pathlib import Path
 
 import mujoco
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageDraw
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import render_assembly as ra  # noqa: E402  (shell sorting, the board)
+import render_assembly as ra  # noqa: E402  (shell sorting, the board, fonts)
 
-COVER = ra.ROOT / "Photos" / "RAFT_arm_img.png"
+OUT = ra.ROOT / "Photos"
 SS = 2                                                   # rendered at twice the saved size, then scaled down
 BODIES = ["base_link", "link1", "link2", "link3", "link4", "link5", "link6", "gripper_trigger"]
+POSES = [("standby", "Standby"), ("handle_in_front", "Handle in front"), ("reach_forward", "Reach forward"),
+         ("stretched", "Stretched"), ("rest", "Rest")]
 
-# the studio in the Source Robotics palette: Dark Charcoal / Dark Gray
-STUDIO = dict(top=(0.161, 0.169, 0.216), bottom=(0.067, 0.071, 0.086), floor=(0.09, 0.094, 0.11), refl=0.22,
-              key=0.6, fill=0.18, rim=0.5, amb=0.24)
+# Source Robotics palette for the studio: Ghost Gray / Light Gray (light), Dark Charcoal / Dark Gray (dark)
+THEMES = {
+    "light": dict(top=(0.961, 0.961, 0.961), bottom=(0.894, 0.894, 0.894), floor=(0.93, 0.93, 0.935), refl=0.0,
+                  ink=(41, 43, 55), key=0.58, fill=0.26, rim=0.22, amb=0.34),
+    "dark": dict(top=(0.161, 0.169, 0.216), bottom=(0.067, 0.071, 0.086), floor=(0.09, 0.094, 0.11), refl=0.22,
+                 ink=(228, 228, 228), key=0.6, fill=0.18, rim=0.5, amb=0.24),
+}
 # the model's palette: printed parts, servos, horns, screws (render_assembly's piece classes -> palette keys)
 # RAFT's starting colours in robot_descriptions' palette (source/appearance/colors.json: raft_* keys, motors)
 PALETTE = {"structure": [0.3, 0.31, 0.335, 1], "motors": [0.06, 0.06, 0.065, 1], "horns": [0.74, 0.76, 0.79, 1],
@@ -58,8 +65,8 @@ def pieces_with_links(esp32):
     return pieces
 
 
-def build_model(pieces, tmp):
-    t = STUDIO
+def build_model(pieces, theme, tmp):
+    t = THEMES[theme]
     mats, assets, bodies = [], [], {b: [] for b in BODIES}
     for k, v in MATS.items():
         mats.append(f'<material name="m_{k}" rgba="{v["rgba"]}" specular="{v["specular"]}" shininess="{v["shininess"]}" reflectance="0"/>')
@@ -180,18 +187,43 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--esp32", help="the ESP32-PoE STEP (or GLB), to show the board on the Base")
     a = ap.parse_args()
+    OUT.mkdir(exist_ok=True)
     pieces = pieces_with_links(a.esp32)
     poser = Poser()
-    key, azimuth, elevation = "handle_in_front", 116, -18
-    lookat, distance = fit(posed_points(pieces, poser, key), azimuth, elevation, 1.6, 1.16)
+    HERO = ("handle_in_front", 116, -18)
+    BACK = ("reach_forward", 312, -24)
+    SIDE = (94, -13)
+    TILE = (600, 470)
+    # one scale for every pose tile: the largest distance any pose needs
+    side = {k: fit(posed_points(pieces, poser, k), *SIDE, TILE[0] / TILE[1], 1.04) for k, _ in POSES}
+    dside = max(d for _, d in side.values())
+    hero = fit(posed_points(pieces, poser, HERO[0]), HERO[1], HERO[2], 1.6, 1.16)
+    back = fit(posed_points(pieces, poser, BACK[0]), BACK[1], BACK[2], 1.6, 1.08)
     with tempfile.TemporaryDirectory() as tmp:
-        sm = build_model(pieces, tmp)
-        sd = mujoco.MjData(sm)
-        r = mujoco.Renderer(sm, 1000 * SS, 1600 * SS)
-        poser.apply(key, sm, sd)
-        render(r, sd, lookat, distance, azimuth, elevation, (1600, 1000)).save(COVER, optimize=True)
-        r.close()
-    print("wrote", COVER)
+        for theme in THEMES:
+            sm = build_model(pieces, theme, tmp)
+            sd = mujoco.MjData(sm)
+            r = mujoco.Renderer(sm, 1000 * SS, 1600 * SS)
+            ink = THEMES[theme]["ink"]
+            poser.apply(HERO[0], sm, sd)
+            img = render(r, sd, hero[0], hero[1], HERO[1], HERO[2], (1600, 1000))
+            img.save(OUT / f"render_hero_{theme}.png", optimize=True)
+            if theme == "dark":
+                img.save(OUT / "RAFT_arm_img.png", optimize=True)      # the README's cover
+            poser.apply(BACK[0], sm, sd)
+            render(r, sd, back[0], back[1], BACK[1], BACK[2], (1600, 1000)).save(OUT / f"render_back_{theme}.png", optimize=True)
+            r.close()
+            r = mujoco.Renderer(sm, TILE[1] * SS, TILE[0] * SS)
+            strip = Image.new("RGB", (TILE[0] * len(POSES), TILE[1]))
+            for i, (key, label) in enumerate(POSES):
+                poser.apply(key, sm, sd)
+                c = side[key][0].copy(); c[2] = 0.105                     # the same height for every tile
+                t = render(r, sd, c, dside, SIDE[0], SIDE[1], TILE)
+                ImageDraw.Draw(t).text((28, 24), label, fill=ink, font=ra.font(28, bold=True))
+                strip.paste(t, (TILE[0] * i, 0))
+            strip.save(OUT / f"render_poses_{theme}.png", optimize=True)
+            r.close()
+            print("wrote", theme)
 
 
 if __name__ == "__main__":

@@ -1,14 +1,14 @@
 # RAFT models: getting started
 
-[All models](https://github.com/Source-Robotics/robot_descriptions/blob/ff2bdf30ef9a5e87f86c7eb7ad3ca90ef195f210/README.md) | [PAR6](https://github.com/Source-Robotics/robot_descriptions/blob/ff2bdf30ef9a5e87f86c7eb7ad3ca90ef195f210/guides/par6.md) | [Change colors](https://github.com/Source-Robotics/robot_descriptions/blob/ff2bdf30ef9a5e87f86c7eb7ad3ca90ef195f210/docs/COLORS.md) | [License and attribution](https://github.com/Source-Robotics/robot_descriptions/blob/ff2bdf30ef9a5e87f86c7eb7ad3ca90ef195f210/ATTRIBUTION.md)
+[All models](https://github.com/Source-Robotics/robot_descriptions/blob/v2.19.0/README.md) | [PAR6](https://github.com/Source-Robotics/robot_descriptions/blob/v2.19.0/guides/par6.md) | [Change colors](https://github.com/Source-Robotics/robot_descriptions/blob/v2.19.0/docs/COLORS.md) | [License and attribution](https://github.com/Source-Robotics/robot_descriptions/blob/v2.19.0/ATTRIBUTION.md)
 
 RAFT is the teleoperation leader arm for PAR6: PAR6's kinematic structure at 5/9 scale, with a trigger on its handle
 that drives the follower's gripper. It is available in **MuJoCo and URDF**, in one configuration: the arm with its
 handle and trigger.
 
-To customize appearance, edit the [shared color file](https://github.com/Source-Robotics/robot_descriptions/blob/ff2bdf30ef9a5e87f86c7eb7ad3ca90ef195f210/source/appearance/colors.json) (`raft_structure`,
+To customize appearance, edit the [shared color file](https://github.com/Source-Robotics/robot_descriptions/blob/v2.19.0/source/appearance/colors.json) (`raft_structure`,
 `raft_trigger`, `raft_horns`, `raft_fasteners`; the servos follow `motors`, or the `raft_motors` override) and
-follow the [illustrated color guide](https://github.com/Source-Robotics/robot_descriptions/blob/ff2bdf30ef9a5e87f86c7eb7ad3ca90ef195f210/docs/COLORS.md). One palette covers both formats and all tools.
+follow the [illustrated color guide](https://github.com/Source-Robotics/robot_descriptions/blob/v2.19.0/docs/COLORS.md). One palette covers both formats and all tools.
 
 ![RAFT, the handle held in front](previews/raft.png)
 
@@ -22,8 +22,8 @@ are needed to use these downloads.
 
 | Format | Entry file |
 | --- | --- |
-| MuJoCo | [`scene.xml`](https://github.com/Source-Robotics/robot_descriptions/blob/ff2bdf30ef9a5e87f86c7eb7ad3ca90ef195f210/mujoco/raft/scene.xml) to look at it, [`raft.xml`](https://github.com/Source-Robotics/robot_descriptions/blob/ff2bdf30ef9a5e87f86c7eb7ad3ca90ef195f210/mujoco/raft/raft.xml) to put it into another MuJoCo world |
-| URDF | [`raft.urdf`](https://github.com/Source-Robotics/robot_descriptions/blob/ff2bdf30ef9a5e87f86c7eb7ad3ca90ef195f210/urdf/raft_description/raft.urdf) |
+| MuJoCo | [`scene.xml`](https://github.com/Source-Robotics/robot_descriptions/blob/v2.19.0/mujoco/raft/scene.xml) to look at it, [`raft.xml`](https://github.com/Source-Robotics/robot_descriptions/blob/v2.19.0/mujoco/raft/raft.xml) to put it into another MuJoCo world |
+| URDF | [`raft.urdf`](https://github.com/Source-Robotics/robot_descriptions/blob/v2.19.0/urdf/raft_description/raft.urdf) |
 
 ## 2. Open the model
 
@@ -45,7 +45,7 @@ into a separate working directory or ROS workspace to use the actual model packa
 **URDF viewer:** open `raft_description/raft.urdf`, keeping the `meshes/` directory alongside it.
 
 **ROS 2 / RViz:** install the extracted `raft_description` package with colcon using
-[the ROS 2 guide](https://github.com/Source-Robotics/robot_descriptions/blob/ff2bdf30ef9a5e87f86c7eb7ad3ca90ef195f210/docs/ROS2.md), source your workspace, then run:
+[the ROS 2 guide](https://github.com/Source-Robotics/robot_descriptions/blob/v2.19.0/docs/ROS2.md), source your workspace, then run:
 
 ```bash
 ros2 launch raft_description display.launch.py
@@ -64,11 +64,11 @@ The MuJoCo actuators (`<joint>_actuator`) take joint torque in Nm, as RAFT's ser
 
 ## 4. Check dimensions and frames
 
-- [RAFT DH convention](https://github.com/Source-Robotics/robot_descriptions/blob/ff2bdf30ef9a5e87f86c7eb7ad3ca90ef195f210/mujoco/raft/docs/DH.md)
-- [RAFT and PAR6: the 5/9 scale](https://github.com/Source-Robotics/robot_descriptions/blob/ff2bdf30ef9a5e87f86c7eb7ad3ca90ef195f210/mujoco/raft/docs/KINEMATICS_COMPARISON.md)
-- [Joint ranges and where they come from](https://github.com/Source-Robotics/robot_descriptions/blob/ff2bdf30ef9a5e87f86c7eb7ad3ca90ef195f210/mujoco/raft/docs/JOINT_LIMITS.md)
-- [Masses, centres of mass and inertias](https://github.com/Source-Robotics/robot_descriptions/blob/ff2bdf30ef9a5e87f86c7eb7ad3ca90ef195f210/mujoco/raft/docs/DYNAMICS.md)
-- [Actuation and the J2 counterbalance](https://github.com/Source-Robotics/robot_descriptions/blob/ff2bdf30ef9a5e87f86c7eb7ad3ca90ef195f210/mujoco/raft/docs/ACTUATION.md)
+- [RAFT DH convention](https://github.com/Source-Robotics/robot_descriptions/blob/v2.19.0/mujoco/raft/docs/DH.md)
+- [RAFT and PAR6: the 5/9 scale](https://github.com/Source-Robotics/robot_descriptions/blob/v2.19.0/mujoco/raft/docs/KINEMATICS_COMPARISON.md)
+- [Joint ranges and where they come from](https://github.com/Source-Robotics/robot_descriptions/blob/v2.19.0/mujoco/raft/docs/JOINT_LIMITS.md)
+- [Masses, centres of mass and inertias](https://github.com/Source-Robotics/robot_descriptions/blob/v2.19.0/mujoco/raft/docs/DYNAMICS.md)
+- [Actuation and the J2 counterbalance](https://github.com/Source-Robotics/robot_descriptions/blob/v2.19.0/mujoco/raft/docs/ACTUATION.md)
 
 One end of every joint range is a mechanical stop measured on the first arm; the masses come from the CAD; the
 servos' friction, damping and rotor inertia are estimates.
@@ -78,7 +78,7 @@ servos' friction, damping and rotor inertia are estimates.
 RAFT's parts, BOM, assembly manual and ESP32 firmware are in the
 [RAFT repository](https://github.com/Source-Robotics/RAFT-teleoperation-arm). Its firmware computes gravity
 compensation from the same model reference these packages are built from
-([`source/raft/`](https://github.com/Source-Robotics/robot_descriptions/blob/ff2bdf30ef9a5e87f86c7eb7ad3ca90ef195f210/source/raft/README.md)).
+([`source/raft/`](https://github.com/Source-Robotics/robot_descriptions/blob/v2.19.0/source/raft/README.md)).
 
 ## Maintained model source
 
@@ -87,6 +87,6 @@ model packages using the links above and extract them into your working director
 All model files are maintained in [robot_descriptions](https://github.com/Source-Robotics/robot_descriptions);
 this hardware repository has no model submodule to initialize.
 
-Current tested model release: **[v2.18.1](https://github.com/Source-Robotics/robot_descriptions/releases/tag/v2.18.1)**.
-See the [shared product guide](https://github.com/Source-Robotics/robot_descriptions/blob/ff2bdf30ef9a5e87f86c7eb7ad3ca90ef195f210/guides/raft.md)
+Current tested model release: **[v2.19.0](https://github.com/Source-Robotics/robot_descriptions/releases/tag/v2.19.0)**.
+See the [shared product guide](https://github.com/Source-Robotics/robot_descriptions/blob/v2.19.0/guides/raft.md)
 for the corresponding central documentation.

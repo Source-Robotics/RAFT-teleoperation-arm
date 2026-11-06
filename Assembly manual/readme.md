@@ -178,7 +178,7 @@ the checks before the first power-up, is in [bring-up step 2](../firmware/docs/b
    its stop screw was taken off.
 4. **Spring (optional).** The J2 counterbalance: [`firmware/docs/spring_mount.md`](../firmware/docs/spring_mount.md).
 
-The pictures are rendered from the arm's 3D model (`raft_description`) by
+The pictures are rendered from the arm's 3D model (the simulators' model in `firmware/tools/sim/model`) by
 [`tools/render_assembly.py`](../tools/render_assembly.py). Run it again after a CAD change. The ESP32-PoE is not part
 of the arm's model: the tool adds it from Olimex's board STEP (`--esp32 ESP32-PoE_Rev_L.step`, needs
 `pip install cascadio`).
